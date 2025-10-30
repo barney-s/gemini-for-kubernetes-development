@@ -448,7 +448,9 @@ func submitReview(c *gin.Context) {
 	repo := c.Param("repo")
 	prID := c.Param("id")
 	var payload struct {
-		Review string `json:"review"`
+		Review     string `json:"review"`
+		AgentDraft string `json:"agentDraft"`
+		UserDraft  string `json:"userDraft"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -480,6 +482,44 @@ func submitReview(c *gin.Context) {
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
+
+	// Get user
+	user, _, err := client.Users.Get(ctx, "")
+	if err != nil {
+		log.Printf("Failed to get user: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user from github"})
+		return
+	}
+
+	// If the drafts are different, record the feedback
+	if payload.AgentDraft != payload.UserDraft {
+		log.Printf("Recording feedback for PR %s in repo %s", prID, repo)
+		// Get prompt from reviewsandbox
+		prompt, err := getPrompt(ctx, repo, prID)
+		if err != nil {
+			log.Printf("Failed to get prompt: %v", err)
+			// Not returning error as this is not critical
+		}
+
+		// Get configdir from reviewsandbox
+		configdir, err := getConfigDir(ctx, repo, prID)
+		if err != nil {
+			log.Printf("Failed to get configdir: %v", err)
+			// Not returning error as this is not critical
+		}
+
+		reviewDataKey := fmt.Sprintf("reviewdata:githubuser:%s:repo:%s:pr:%s", *user.Login, repo, prID)
+		err = rdb.HSet(ctx, reviewDataKey,
+			"userDraft", payload.UserDraft,
+			"agentDraft", payload.AgentDraft,
+			"prompt", prompt,
+			"configdir", configdir,
+		).Err()
+		if err != nil {
+			log.Printf("Failed to save review data: %v", err)
+			// Not returning error as this is not critical
+		}
+	}
 
 	// Parse repo URL
 	repoURL, found, err := unstructured.NestedString(repoWatch.Object, "spec", "repoURL")
@@ -688,6 +728,51 @@ func getRepoWatch(ctx context.Context, name string) (*unstructured.Unstructured,
 		return nil, err
 	}
 	return repoWatch, nil
+}
+
+func getReviewSandbox(ctx context.Context, repo, prID string) (*unstructured.Unstructured, error) {
+	prKey := fmt.Sprintf("pr:repo:%s:pr:%s", repo, prID)
+	sandboxName, err := rdb.HGet(ctx, prKey, "sandbox").Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox name from Redis: %w", err)
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "custom.agents.x-k8s.io",
+		Version:  "v1alpha1",
+		Resource: "reviewsandboxes",
+	}
+	reviewSandbox, err := k8sClient.Resource(gvr).Namespace(namespace).Get(ctx, sandboxName, v1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reviewsandbox: %w", err)
+	}
+	return reviewSandbox, nil
+}
+
+func getPrompt(ctx context.Context, repo, prID string) (string, error) {
+	reviewSandbox, err := getReviewSandbox(ctx, repo, prID)
+	if err != nil {
+		return "", err
+	}
+
+	prompt, found, err := unstructured.NestedString(reviewSandbox.Object, "spec", "prompt")
+	if err != nil || !found {
+		return "", fmt.Errorf("prompt not found in reviewsandbox")
+	}
+	return prompt, nil
+}
+
+func getConfigDir(ctx context.Context, repo, prID string) (string, error) {
+	reviewSandbox, err := getReviewSandbox(ctx, repo, prID)
+	if err != nil {
+		return "", err
+	}
+
+	configDir, found, err := unstructured.NestedString(reviewSandbox.Object, "spec", "configDir")
+	if err != nil || !found {
+		return "", fmt.Errorf("configDir not found in reviewsandbox")
+	}
+	return configDir, nil
 }
 
 func getIssues(c *gin.Context) {

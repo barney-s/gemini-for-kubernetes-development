@@ -339,10 +339,16 @@ func (r *RepoWatchReconciler) reconcileReviewSandboxes(ctx context.Context, repo
 				if replicas > 0 {
 					activeSandboxes++
 				}
+				prompt, found, err := unstructured.NestedString(sandbox.Object, "spec", "gemini", "prompt")
+				if err != nil || !found {
+					log.Error(err, "unable to get prompt for sandbox", "sandbox", sandbox.GetName())
+					break
+				}
 				watchedPRs = append(watchedPRs, reviewv1alpha1.WatchedPR{
 					Number:      *pr.Number,
 					SandboxName: sandboxName,
 					Status:      "Active",
+					Draft:       prompt,
 				})
 				break
 			}
@@ -351,6 +357,11 @@ func (r *RepoWatchReconciler) reconcileReviewSandboxes(ctx context.Context, repo
 		if !sandboxExists {
 			if activeSandboxes < repoWatch.Spec.Review.MaxActiveSandboxes {
 				log.Info("creating sandbox for pr", "pr", *pr.Number)
+				prompt, err := r.generateReviewPrompt(repoWatch, pr)
+				if err != nil {
+					log.Error(err, "unable to generate review prompt for pr", "pr", *pr.Number)
+					continue
+				}
 				if err := r.createReviewSandboxForPR(ctx, repoWatch, pr); err != nil {
 					log.Error(err, "unable to create sandbox for pr", "pr", *pr.Number)
 				} else {
@@ -359,6 +370,7 @@ func (r *RepoWatchReconciler) reconcileReviewSandboxes(ctx context.Context, repo
 						Number:      *pr.Number,
 						SandboxName: sandboxName,
 						Status:      "Creating",
+						Draft:       prompt,
 					})
 				}
 			} else {

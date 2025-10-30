@@ -118,6 +118,8 @@ type WatchedPR struct {
 	SandboxName string `json:"sandboxName"`
 	// Status of the sandbox
 	Status string `json:"status"`
+	// Draft of the review
+	Draft string `json:"draft,omitempty"`
 }
 
 // PendingPR defines the state of a pending PR

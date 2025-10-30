@@ -7,7 +7,8 @@ function App() {
   const [activeSubTab, setActiveSubTab] = useState({ repo: '', name: '' });
   const [prs, setPrs] = useState([]);
   const [issues, setIssues] = useState([]);
-  const [drafts, setDrafts] = useState({});
+  const [userDrafts, setUserDrafts] = useState({});
+  const [agentDrafts, setAgentDrafts] = useState({});
 
   useEffect(() => {
     fetch('/api/repos')
@@ -37,11 +38,14 @@ function App() {
           .then(data => {
             const safeData = data || [];
             setPrs(safeData);
-            const initialDrafts = {};
+            const initialUserDrafts = {};
+            const initialAgentDrafts = {};
             safeData.forEach(pr => {
-              initialDrafts[pr.id] = pr.draft || '';
+              initialUserDrafts[pr.id] = pr.draft || '';
+              initialAgentDrafts[pr.id] = pr.draft || '';
             });
-            setDrafts(initialDrafts);
+            setUserDrafts(initialUserDrafts);
+            setAgentDrafts(initialAgentDrafts);
           })
           .catch(err => console.error(`Failed to fetch PRs for ${activeRepo}:`, err));
       } else if (activeSubTab.name) {
@@ -55,7 +59,7 @@ function App() {
             safeData.forEach(issue => {
               initialDrafts[issue.id] = issue.draft || '';
             });
-            setDrafts(initialDrafts);
+            setUserDrafts(initialDrafts);
           })
           .catch(err => console.error(`Failed to fetch issues for ${activeRepo} handler ${activeSubTab.name}:`, err));
       }
@@ -91,7 +95,7 @@ function App() {
   };
 
   const handleSaveDraft = (id) => {
-    const draft = drafts[id];
+    const draft = userDrafts[id];
     fetch(`/api/repo/${activeRepo}/prs/${id}/draft`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,26 +104,31 @@ function App() {
   };
 
   const handleDraftChange = (id, value) => {
-    setDrafts(prevDrafts => ({
+    setUserDrafts(prevDrafts => ({
       ...prevDrafts,
       [id]: value
     }));
   };
 
   const handleSubmit = (id) => {
-    const review = drafts[id];
-    if (!review.trim()) {
+    const userDraft = userDrafts[id];
+    const agentDraft = agentDrafts[id];
+    if (!userDraft.trim()) {
       alert("Please leave a review comment before Submitting.");
       return;
     }
     fetch(`/api/repo/${activeRepo}/prs/${id}/submitreview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ review })
+      body: JSON.stringify({
+        review: userDraft,
+        agentDraft: agentDraft,
+        userDraft: userDraft,
+      })
     })
     .then(res => {
       if (res.ok) {
-        setPrs(prs.map(pr => pr.id === id ? { ...pr, review, draft: '' } : pr));
+        setPrs(prs.map(pr => pr.id === id ? { ...pr, review: userDraft, draft: '' } : pr));
       } else {
         alert("Failed to submit PR review");
       }
@@ -128,7 +137,7 @@ function App() {
   };
 
   const handleIssueSaveDraft = (issueId, handlerName) => {
-    const draft = drafts[issueId];
+    const draft = userDrafts[issueId];
     fetch(`/api/repo/${activeRepo}/issues/${issueId}/handler/${handlerName}/draft`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -137,7 +146,7 @@ function App() {
   };
 
   const handleIssueSubmit = (issueId, handlerName) => {
-    const comment = drafts[issueId];
+    const comment = userDrafts[issueId];
     if (!comment.trim()) {
       alert("Please leave a comment before Submitting.");
       return;
@@ -201,7 +210,7 @@ function App() {
           ) : (
             <textarea
               className="review-textarea"
-              value={drafts[pr.id] || ''}
+              value={userDrafts[pr.id] || ''}
               onChange={(e) => handleDraftChange(pr.id, e.target.value)}
               onBlur={() => handleSaveDraft(pr.id)}
               placeholder="Leave a review comment..."
@@ -240,7 +249,7 @@ function App() {
           ) : (
             <textarea
               className="review-textarea"
-              value={drafts[issue.id] || ''}
+              value={userDrafts[issue.id] || ''}
               onChange={(e) => handleDraftChange(issue.id, e.target.value)}
               onBlur={() => handleIssueSaveDraft(issue.id, activeSubTab.name)}
               placeholder="Leave a comment..."
