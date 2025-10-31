@@ -423,6 +423,7 @@ func fetchAndPopulatePRs(ctx context.Context, repo string) {
 			"htmlurl", pr.HTMLURL,
 			"sandboxReplica", pr.SandboxReplica,
 			"draft", draft,
+			"agentDraft", draft,
 		).Err(); err != nil {
 			log.Printf("Failed to cache PR %s for repo %s: %v", pr.ID, repo, err)
 		}
@@ -463,6 +464,38 @@ func submitReview(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	log.Printf("Submitting review for PR %s in repo %s with review: %s", prID, repo, payload.Review)
+
+	// Get draft and agentDraft from Redis to check for feedback
+	prKey := fmt.Sprintf("pr:repo:%s:pr:%s", repo, prID)
+	prData, err := rdb.HGetAll(ctx, prKey).Result()
+	if err != nil {
+		log.Printf("Failed to get PR data from redis: %v", err)
+	} else {
+		draft := prData["draft"]
+		agentDraft := prData["agentDraft"]
+		if draft != agentDraft {
+			log.Printf("Draft has been modified by user, recording feedback.")
+			// Get sandbox to retrieve prompt and configdir
+			sandbox, err := getReviewSandbox(ctx, repo, prID)
+			if err != nil {
+				log.Printf("Failed to get reviewsandbox: %v", err)
+			} else {
+				prompt, _, _ := unstructured.NestedString(sandbox.Object, "spec", "prompt")
+				configdir, _, _ := unstructured.NestedString(sandbox.Object, "spec", "configdir")
+				// TODO: Get github login
+				login := "unknown_user"
+				feedbackKey := fmt.Sprintf("hf:review:githubuser:%s:repo:%s:pr:%s", login, repo, prID)
+				if err := rdb.HSet(ctx, feedbackKey,
+					"draft", draft,
+					"agentDraft", agentDraft,
+					"prompt", prompt,
+					"configdir", configdir,
+				).Err(); err != nil {
+					log.Printf("Failed to record feedback to redis: %v", err)
+				}
+			}
+		}
+	}
 
 	// Get RepoWatch to get repoURL and secret ref
 	repoWatch, err := getRepoWatch(ctx, repo)
@@ -696,6 +729,41 @@ func getRepoWatch(ctx context.Context, name string) (*unstructured.Unstructured,
 	return repoWatch, nil
 }
 
+func getReviewSandbox(ctx context.Context, repo, prID string) (*unstructured.Unstructured, error) {
+	prKey := fmt.Sprintf("pr:repo:%s:pr:%s", repo, prID)
+	sandboxName, err := rdb.HGet(ctx, prKey, "sandbox").Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox name from Redis: %w", err)
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "custom.agents.x-k8s.io",
+		Version:  "v1alpha1",
+		Resource: "reviewsandboxes",
+	}
+	sandbox, err := k8sClient.Resource(gvr).Namespace(namespace).Get(ctx, sandboxName, v1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reviewsandbox: %w", err)
+	}
+	return sandbox, nil
+}
+
+func getIssueSandbox(ctx context.Context, repo, issueID, handler string) (*unstructured.Unstructured, error) {
+	sandboxName := fmt.Sprintf("%s-issue-%s-%s", repo, issueID, handler)
+	gvr := schema.GroupVersionResource{
+		Group:    "custom.agents.x-k8s.io",
+		Version:  "v1alpha1",
+		Resource: "issuesandboxes",
+	}
+	sandbox, err := k8sClient.Resource(gvr).Namespace(namespace).Get(ctx, sandboxName, v1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get issuesandbox: %w", err)
+	}
+	return sandbox, nil
+}
+
+
+
 func getIssues(c *gin.Context) {
 	repo := c.Param("repo")
 	handler := c.Param("handler")
@@ -837,6 +905,7 @@ func fetchAndPopulateIssues(ctx context.Context, repo, handler string) {
 			"sandboxReplica", fmt.Sprintf("%d", replicas),
 			"branchURL", branchURL,
 			"draft", draft,
+			"agentDraft", draft,
 			"pushBranch", strconv.FormatBool(pushBranch),
 		).Err(); err != nil {
 			log.Printf("Failed to cache Issue %s for repo %s handler %s: %v", issueID, repo, handler, err)
@@ -880,6 +949,38 @@ func submitIssueComment(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	log.Printf("Submitting comment for Issue %s in repo %s with comment: %s", issueID, repo, payload.Comment)
+
+	// Get draft and agentDraft from Redis to check for feedback
+	issueKey := fmt.Sprintf("issue:repo:%s:handler:%s:issue:%s", repo, handler, issueID)
+	issueData, err := rdb.HGetAll(ctx, issueKey).Result()
+	if err != nil {
+		log.Printf("Failed to get Issue data from redis: %v", err)
+	} else {
+		draft := issueData["draft"]
+		agentDraft := issueData["agentDraft"]
+		if draft != agentDraft {
+			log.Printf("Draft has been modified by user, recording feedback.")
+			// Get sandbox to retrieve prompt and configdir
+			sandbox, err := getIssueSandbox(ctx, repo, issueID, handler)
+			if err != nil {
+				log.Printf("Failed to get issuesandbox: %v", err)
+			} else {
+				prompt, _, _ := unstructured.NestedString(sandbox.Object, "spec", "prompt")
+				configdirname, _, _ := unstructured.NestedString(sandbox.Object, "spec", "configdirname")
+				// TODO: Get github login
+				login := "unknown_user"
+				feedbackKey := fmt.Sprintf("hf:issue:githubuser:%s:repo:%s:handler:%s:issue:%s", login, repo, handler, issueID)
+				if err := rdb.HSet(ctx, feedbackKey,
+					"draft", draft,
+					"agentDraft", agentDraft,
+					"prompt", prompt,
+					"configdirname", configdirname,
+				).Err(); err != nil {
+					log.Printf("Failed to record feedback to redis: %v", err)
+				}
+			}
+		}
+	}
 
 	repoWatch, err := getRepoWatch(ctx, repo)
 	if err != nil {
