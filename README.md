@@ -17,6 +17,7 @@ If you do not yet have Gemini CLI installed, or if the installed version is olde
 
 The extension adds following command to Gemini CLI
 - `/dv:enable {<group>/<kind>}`: enable Declarative Validation for a given k8s API resource
+- `/antigravity`: open a web browser to an XKCD comic.
 
 ## Resources
 
