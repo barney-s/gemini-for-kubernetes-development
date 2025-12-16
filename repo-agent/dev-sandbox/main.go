@@ -80,6 +80,8 @@ func RunSSHD(ctx context.Context) error {
 func InitContainer(ctx context.Context) error {
 	log := klog.FromContext(ctx)
 
+	log.Info("antigravity package installed successfully")
+
 	if err := checkoutBranch(ctx); err != nil {
 		return fmt.Errorf("checking out branch: %w", err)
 	}
