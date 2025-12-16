@@ -69,6 +69,25 @@ The examples also demonstrate how to use `ConfigDir` and `devcontainer` to creat
 
 By customizing the `RepoWatch` resource and the `devcontainer` configuration, you can create a powerful and flexible Gemini agent that is tailored to your specific needs.
 
+#### Using a Custom Devcontainer
+
+When you provide your own `devcontainer.json`, you need to ensure that the environment includes all the necessary tools for the sandbox to operate correctly. The two key dependencies are `gemini-cli` and `code-server`.
+
+To simplify the process of setting up a custom devcontainer, we provide a composite devcontainer feature called `sandbox-essentials`. This feature bundles all the required tools.
+
+To use it, add the following to your `devcontainer.json`:
+
+```json
+{
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "./features/sandbox-essentials": {}
+  }
+}
+```
+
+This will ensure that your custom devcontainer is compatible with the sandbox environment.
+
 #### Creating a configdir from your .gemini folder
 
 Build the `configdir-cli` binary
