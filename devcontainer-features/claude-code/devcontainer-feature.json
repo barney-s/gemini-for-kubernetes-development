@@ -2,7 +2,7 @@
     "name": "claude-code",
     "id": "claude-code",
     "version": "0.1.0",
-    "description": "Claude Code CLI",
+    "description": "Claude Code",
     "options": {
         "version": {
             "type": "string",

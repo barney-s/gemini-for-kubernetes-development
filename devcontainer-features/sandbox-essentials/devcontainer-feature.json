@@ -5,6 +5,7 @@
     "description": "Installs tools required for gemini-for-kubernetes-development sandboxes.",
     "dependsOn": {
         "ghcr.io/coder/devcontainer-features/code-server:1": {},
-        "./gemini-cli": {}
+        "./gemini-cli": {},
+        "./claude-code": {}
     }
 }
