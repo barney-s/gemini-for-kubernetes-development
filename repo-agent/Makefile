@@ -84,10 +84,6 @@ test-unit:
 lint-go:
 	../dev/tools/lint-go --working-dir ./
 
-.PHONY: lint-go-devcontainer-features
-lint-go-devcontainer-features:
-	../dev/tools/lint-go --working-dir ./devcontainer-features
-
 .PHONY: install-dep-packages
 install-dep-packages:
 	../dev/tools/install-kro
