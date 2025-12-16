@@ -22,6 +22,8 @@ var (
 )
 
 func main() {
+	log.Println("antigravity package installed successfully")
+
 	go agentoutput.Run("issue", gvr)
 
 	cmdCodeSrv, err := codeserver.Start()
