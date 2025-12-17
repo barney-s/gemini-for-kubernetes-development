@@ -250,7 +250,7 @@ func (r *RepoWatchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		// If we see this error : "GET https://api.github.com/user: 403 Resource not accessible by integration []"
 		// we are running in a github workflow with a GITHUB_TOKEN that does not have access to read user info.
 		// In this case we just log a warning and set fake user info.
-		if strings.Contains(err.Error(), "403 Resource not accessible by integration") {
+		if os.Getenv("REPO_AGENT_TEST_ENV") == "true" && strings.Contains(err.Error(), "403 Resource not accessible by integration") {
 			log.Info("Warning: unable to get current user info due to insufficient permissions. Using fallback user info.")
 			user = &github.User{
 				Login: github.String("fake-user"),
