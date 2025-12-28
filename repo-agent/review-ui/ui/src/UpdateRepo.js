@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import yaml from 'js-yaml';
 import DeleteRepo from './DeleteRepo';
+import FiltersEditor from './FiltersEditor';
 
 function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
     const [activeTab, setActiveTab] = useState('config'); // 'config' or 'instructions'
@@ -8,6 +9,7 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
     const [originalYamlContent, setOriginalYamlContent] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [parsedSpec, setParsedSpec] = useState({});
 
     // Instructions state
     const [currentInstructions, setCurrentInstructions] = useState('');
@@ -65,13 +67,12 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
         }
     }, [activeTab, fetchInstructions]);
 
-    const handleConfigSubmit = async (e) => {
-        e.preventDefault();
+    const submitConfig = async (content) => {
         setError('');
         setIsLoading(true);
 
         try {
-            const parsed = yaml.load(yamlContent);
+            const parsed = yaml.load(content);
             if (!parsed) throw new Error("YAML is empty or invalid");
 
             const currentRepoURL = parsed?.repoURL;
@@ -92,7 +93,7 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
         fetch(`/api/repos/${repo.name}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ yaml: yamlContent })
+            body: JSON.stringify({ yaml: content })
         })
         .then(async (res) => {
             if (!res.ok) {
@@ -117,6 +118,11 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
             setError(err.message + hint);
             setIsLoading(false);
         });
+    };
+
+    const handleConfigSubmit = async (e) => {
+        e.preventDefault();
+        submitConfig(yamlContent);
     };
 
     const handleInstructionAction = (action) => {
@@ -158,6 +164,28 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
         });
     };
 
+    const handleTabChange = (tab) => {
+        if (tab === 'filters') {
+            try {
+                const doc = yaml.load(yamlContent);
+                setParsedSpec(doc || {});
+            } catch (e) {
+                setError("Cannot switch to Filters tab: Invalid YAML");
+                return;
+            }
+        } else if (activeTab === 'filters') {
+            try {
+                const newYaml = yaml.dump(parsedSpec);
+                setYamlContent(newYaml);
+            } catch (e) {
+                console.error("Failed to dump YAML", e);
+                // Don't block switching, but maybe warn?
+            }
+        }
+        setActiveTab(tab);
+        setError('');
+    };
+
     return (
         <div className="add-repo-container" style={{maxWidth: '1000px'}}>
             <h2>Repository Settings: {repo.name}</h2>
@@ -165,13 +193,19 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
             <div className="repo-tabs" style={{justifyContent: 'flex-start', marginBottom: '20px'}}>
                 <button 
                     className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('config')}
+                    onClick={() => handleTabChange('config')}
                 >
                     Configuration
                 </button>
                 <button 
+                    className={`tab-btn ${activeTab === 'filters' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('filters')}
+                >
+                    Filters
+                </button>
+                <button 
                     className={`tab-btn ${activeTab === 'instructions' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('instructions')}
+                    onClick={() => handleTabChange('instructions')}
                 >
                     User Instructions
                     {hasDraft && <span style={{marginLeft: '5px', color: '#orange'}}>●</span>} 
@@ -203,6 +237,68 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
                             </button>
                         </div>
                     </form>
+                </>
+            )}
+
+            {activeTab === 'filters' && (
+                <>
+                    {error && <div className="message error">{error}</div>}
+                    <div className="add-repo-form">
+                        <FiltersEditor 
+                            spec={parsedSpec} 
+                            onChange={(newSpec) => setParsedSpec(newSpec)} 
+                        />
+                        <div className="form-actions">
+                            <button 
+                                type="button" 
+                                className="btn btn-submit" 
+                                disabled={isLoading}
+                                onClick={(e) => {
+                                    // Update yamlContent from parsedSpec then submit
+                                    try {
+                                        const newYaml = yaml.dump(parsedSpec);
+                                        setYamlContent(newYaml);
+                                        // We need to wait for state update? No, existing handleConfigSubmit uses yamlContent state.
+                                        // But setYamlContent is async.
+                                        // We can't rely on state update immediately.
+                                        // Let's modify handleConfigSubmit to accept content argument or refactor.
+                                        // For now, I'll just hack it by setting state and calling a specialized submit or verify if handleConfigSubmit uses state reference.
+                                        // It uses `yamlContent` from closure. So we need to pass it.
+                                        
+                                        // Creating a synthetic event? No.
+                                        // Let's create a submit handler that takes the yaml string.
+                                        
+                                        // For now, I'll update state and use a separate submit function.
+                                        // Or better: update yamlContent and trigger submit in useEffect? No.
+                                        
+                                        // I'll refactor handleConfigSubmit to take optional yaml string.
+                                    } catch (err) {
+                                        setError("Failed to generate YAML: " + err.message);
+                                        return;
+                                    }
+                                    
+                                    // Actually, I can just call fetch directly here similar to handleConfigSubmit
+                                    // But handleConfigSubmit has validation logic.
+                                    
+                                    // Let's create a submit helper.
+                                    const content = yaml.dump(parsedSpec);
+                                    // Update state for consistency
+                                    setYamlContent(content); 
+                                    
+                                    // Re-implement submit logic here for now to avoid complex refactoring
+                                    // OR, I can pass the content to handleConfigSubmit if I change its signature.
+                                    // But it's an event handler.
+                                    
+                                    submitConfig(content);
+                                }}
+                            >
+                                {isLoading ? 'Updating...' : 'Save Filters'}
+                            </button>
+                            <button type="button" className="btn" onClick={onCancel} disabled={isLoading}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </>
             )}
 
