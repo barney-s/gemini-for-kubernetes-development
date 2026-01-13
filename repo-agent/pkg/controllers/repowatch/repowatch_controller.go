@@ -328,7 +328,7 @@ func (r *Reconciler) reconcileReviews(ctx context.Context, repoWatch *reviewv1al
 
 	explicitPRs := r.getExplicitPRs(ctx, ghClient, repoWatch, owner, repo)
 
-	prs, err := r.listOpenPRs(ctx, ghClient, owner, repo)
+	prs, err := r.listPRsByFilter(ctx, ghClient, repoWatch, owner, repo, user)
 	if err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func (r *Reconciler) reconcileReviews(ctx context.Context, repoWatch *reviewv1al
 		return err
 	}
 
-	watchedPRs, pendingPRs, activeSandboxes := r.reconcileReviewSandboxesInternal(ctx, repoWatch, explicitPRs, prs, sandboxList)
+	watchedPRs, pendingPRs, activeSandboxes := r.reconcileReviewSandboxesInternal(ctx, ghClient, owner, repo, repoWatch, explicitPRs, prs, sandboxList)
 
 	repoWatch.Status.ActiveSandboxCount = activeSandboxes
 	repoWatch.Status.ReviewSandboxes = watchedPRs
@@ -410,6 +410,115 @@ func (r *Reconciler) listOpenPRs(ctx context.Context, ghClient *github.Client, o
 		opts.Page = resp.NextPage
 	}
 	return prs, nil
+}
+
+func (r *Reconciler) listPRsByFilter(ctx context.Context, ghClient *github.Client, repoWatch *reviewv1alpha1.RepoWatch, owner, repo string, user *github.User) ([]*github.PullRequest, error) {
+	log := log.FromContext(ctx)
+
+	hasAssignees := len(repoWatch.Spec.Review.Assignees) > 0 || repoWatch.Spec.Review.AssignedToSelf
+	hasLabels := len(repoWatch.Spec.Review.Labels) > 0
+
+	// If no filters are provided, fallback to listing all open PRs
+	if !hasAssignees && !hasLabels {
+		return r.listOpenPRs(ctx, ghClient, owner, repo)
+	}
+
+	var allFoundPRs []*github.PullRequest
+	foundPRMap := make(map[int]bool)
+
+	// Helper to add PRs to the list avoiding duplicates
+	addPRs := func(prs []*github.PullRequest) {
+		for _, pr := range prs {
+			if !foundPRMap[*pr.Number] {
+				foundPRMap[*pr.Number] = true
+				allFoundPRs = append(allFoundPRs, pr)
+			}
+		}
+	}
+
+	// Strategy:
+	// 1. If Assignees are specified, search by Assignee. This is usually the most restrictive filter.
+	// 2. If Labels are specified AND Assignees are NOT specified, search by Label.
+	// Note: If BOTH are specified, we search by Assignee (smaller set usually) and then the existing filterPRsByLabels logic will filter them further.
+
+	if hasAssignees {
+		// Collect all assignees to search for
+		assigneesToSearch := make([]string, 0, len(repoWatch.Spec.Review.Assignees)+1)
+		assigneesToSearch = append(assigneesToSearch, repoWatch.Spec.Review.Assignees...)
+
+		if repoWatch.Spec.Review.AssignedToSelf && user != nil && user.Login != nil {
+			assigneesToSearch = append(assigneesToSearch, *user.Login)
+		}
+
+		for _, assignee := range assigneesToSearch {
+			query := fmt.Sprintf("repo:%s/%s is:pr state:open assignee:%s", owner, repo, assignee)
+			log.Info("searching PRs by assignee", "query", query)
+			prs, err := r.searchPRs(ctx, ghClient, query)
+			if err != nil {
+				log.Error(err, "failed to search PRs", "query", query)
+				continue
+			}
+			addPRs(prs)
+		}
+	} else if hasLabels {
+		// Search by Labels
+		// Labels are [][]string. Inner is AND, Outer is OR.
+		for _, labelSet := range repoWatch.Spec.Review.Labels {
+			// Construct query for this label set
+			query := fmt.Sprintf("repo:%s/%s is:pr state:open", owner, repo)
+			for _, label := range labelSet {
+				query += fmt.Sprintf(" label:\"%s\"", label)
+			}
+			log.Info("searching PRs by label", "query", query)
+			prs, err := r.searchPRs(ctx, ghClient, query)
+			if err != nil {
+				log.Error(err, "failed to search PRs", "query", query)
+				continue
+			}
+			addPRs(prs)
+		}
+	}
+
+	return allFoundPRs, nil
+}
+
+func (r *Reconciler) searchPRs(ctx context.Context, ghClient *github.Client, query string) ([]*github.PullRequest, error) {
+	opts := &github.SearchOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var allPRs []*github.PullRequest
+
+	for {
+		result, resp, err := ghClient.Search.Issues(ctx, query, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, issue := range result.Issues {
+			// Convert Issue to minimal PullRequest
+			pr := &github.PullRequest{
+				Number:    issue.Number,
+				Title:     issue.Title,
+				HTMLURL:   issue.HTMLURL,
+				ID:        issue.ID,
+				CreatedAt: issue.CreatedAt,
+				UpdatedAt: issue.UpdatedAt,
+				// Populate Labels and Assignees for subsequent filtering
+				Labels:    issue.Labels,
+				Assignees: issue.Assignees,
+				User:      issue.User,
+			}
+			// Head and Base are NOT populated here. Will need fetching later.
+			allPRs = append(allPRs, pr)
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return allPRs, nil
 }
 
 func (r *Reconciler) filterPRsByLabels(prs []*github.PullRequest, repoWatch *reviewv1alpha1.RepoWatch) []*github.PullRequest {
@@ -513,7 +622,7 @@ func (r *Reconciler) excludePRs(prs []*github.PullRequest, repoWatch *reviewv1al
 	return filteredPRs
 }
 
-func (r *Reconciler) reconcileReviewSandboxesInternal(ctx context.Context, repoWatch *reviewv1alpha1.RepoWatch, explicitPRs []*github.PullRequest, prs []*github.PullRequest, sandboxes *unstructured.UnstructuredList) ([]reviewv1alpha1.WatchedPR, []int, int) {
+func (r *Reconciler) reconcileReviewSandboxesInternal(ctx context.Context, ghClient *github.Client, owner, repo string, repoWatch *reviewv1alpha1.RepoWatch, explicitPRs []*github.PullRequest, prs []*github.PullRequest, sandboxes *unstructured.UnstructuredList) ([]reviewv1alpha1.WatchedPR, []int, int) {
 	log := log.FromContext(ctx)
 
 	ownedSandboxes := getOwnedSandboxes(sandboxes.Items, repoWatch.UID)
@@ -609,6 +718,17 @@ func (r *Reconciler) reconcileReviewSandboxesInternal(ctx context.Context, repoW
 			if prIsExplicit || (activeSandboxes < repoWatch.Spec.Review.MaxActiveSandboxes) &&
 				(repoWatch.Spec.Review.MaxSandboxes == 0 || totalSandboxes < repoWatch.Spec.Review.MaxSandboxes) {
 				log.Info("creating sandbox for PR", "pr", *pr.Number)
+
+				// Ensure we have full PR details (e.g. if fetched via Search)
+				if pr.Head == nil {
+					fullPR, _, err := ghClient.PullRequests.Get(ctx, owner, repo, *pr.Number)
+					if err != nil {
+						log.Error(err, "unable to fetch full PR details", "pr", *pr.Number)
+						continue
+					}
+					*pr = *fullPR
+				}
+
 				if err := r.createReviewSandboxForPR(ctx, repoWatch, pr); err != nil {
 					log.Error(err, "unable to create sandbox for PR", "pr", *pr.Number)
 				} else {
