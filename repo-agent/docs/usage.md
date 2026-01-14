@@ -9,6 +9,14 @@ Depending on the installation, you would need to expose the UI using port-forwar
 Using the UI, you can register for new repositories.
 It would create a default repowatch for the given github repo URL.
 
+### AI-Driven PR Sorting
+
+In the repository dashboard, you can click the **"Sort by AI"** button in the "Review" tab to sort the list of active Pull Requests by priority and urgency. The AI analyzes the PR titles and agent summaries to determine the ranking.
+
+You can customize the sorting logic (prompt) in two ways:
+1.  **User Level (Preferred):** Go to **Settings** in the top right corner and enter a "Custom Sort Prompt". This will apply to all repositories you view.
+2.  **Repo Level:** Add an annotation to the `RepoWatch` custom resource: `review.gemini.google.com/sort-prompt: "Your custom prompt here"`.
+
 ## Adding your own `repowatch`
 
 Another way is to create the `repowatch` CR manually and applying it to the cluster.
