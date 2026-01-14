@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	OAuthPATKey  = "oauth_pat"
-	ManualPATKey = "manual_pat"
+	OAuthPATKey   = "oauth_pat"
+	ManualPATKey  = "manual_pat"
+	SortPromptKey = "sort_prompt"
 )
 
 var (

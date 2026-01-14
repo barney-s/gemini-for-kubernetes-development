@@ -42,6 +42,8 @@ function App() {
   const [devModalOpen, setDevModalOpen] = useState(false);
   const [newDevBranch, setNewDevBranch] = useState('');
   const [newDevPrompt, setNewDevPrompt] = useState('');
+  const [isSorting, setIsSorting] = useState(false);
+  const [sortMode, setSortMode] = useState('date'); // 'date' or 'ai'
 
 
   useEffect(() => {
@@ -170,6 +172,7 @@ function App() {
             const safeData = data || [];
             setPrs(safeData);
             setLastUpdated(new Date());
+            setSortMode('date'); // Reset sort mode on refresh
             
             setDrafts(prev => {
                 const next = merge ? { ...prev } : {};
@@ -598,12 +601,12 @@ function App() {
       // Escape single quotes for bash single-quoted string using unicode escape
       const escapedJSONBody = jsonBody.replace(/'/g, '\\u0027');
 
-      const curlCmd = `curl -L \\
-  -X POST \\
-  -H "Accept: application/vnd.github+json" \\
-  -H "Authorization: Bearer <YOUR_TOKEN>" \\
-  -H "X-GitHub-Api-Version: 2022-11-28" \\
-  https://api.github.com/repos/${owner}/${repoName}/pulls/${id}/reviews \\
+      const curlCmd = `curl -L \
+  -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/${owner}/${repoName}/pulls/${id}/reviews \
   -d '${escapedJSONBody}'`;
 
       if (onSuccess) {
@@ -864,6 +867,41 @@ function App() {
     }
   };
 
+  const handleSortByAI = () => {
+    if (!activeRepo) return;
+    setIsSorting(true);
+    fetch(`/api/repo/${activeRepo.name}/sort`, { method: 'POST' })
+      .then(res => res.json())
+      .then(sortedIDs => {
+          if (Array.isArray(sortedIDs)) {
+              setPrs(prevPrs => {
+                  const prMap = new Map(prevPrs.map(pr => [pr.id, pr]));
+                  const newPrs = [];
+                  sortedIDs.forEach(id => {
+                      // ID might be string or number in response/map
+                      const pr = prMap.get(String(id));
+                      if (pr) {
+                          newPrs.push(pr);
+                          prMap.delete(String(id));
+                      }
+                  });
+                  // Append remaining
+                  prMap.forEach(pr => newPrs.push(pr));
+                  return newPrs;
+              });
+              setSortMode('ai');
+          } else if (sortedIDs.error) {
+              alert("Sort failed: " + sortedIDs.error);
+          }
+          setIsSorting(false);
+      })
+      .catch(err => {
+          console.error("Sort failed:", err);
+          alert("Sort failed");
+          setIsSorting(false);
+      });
+  };
+
   const renderContent = () => {
     if (!activeRepo) return <p>Please select or add a repository to watch.</p>;
     const namespace = user || 'default';
@@ -873,7 +911,11 @@ function App() {
         if (prs.length > 0) {
             prs.forEach(pr => activeList.push({ ...pr, type: 'active', sortId: parseInt(pr.id) }));
         }
-        activeList.sort((a, b) => b.sortId - a.sortId);
+        
+        // Only sort by date if NOT in AI mode
+        if (sortMode === 'date') {
+            activeList.sort((a, b) => b.sortId - a.sortId);
+        }
         
         // 2. Pending PRs
         const pending = activeRepo.pendingPRs || [];
@@ -1126,6 +1168,11 @@ function App() {
                     <span className="assignee-filter" title={`Watching PRs assigned to: ${activeRepo.review.assignees.join(', ')}`} style={{marginRight: '15px', fontSize: '0.9em', color: '#666', border: '1px solid #ddd', padding: '2px 8px', borderRadius: '12px', backgroundColor: '#f9f9f9'}}>
                         Filter: {activeRepo.review.assignees.join(', ')}
                     </span>
+                )}
+                {activeSubTab.name === 'review' && (
+                    <button className="btn" onClick={handleSortByAI} disabled={isSorting} title="Sort PRs by AI priority" style={{marginRight: '10px', backgroundColor: isSorting ? '#ccc' : '#28a745'}}>
+                        {isSorting ? 'Sorting...' : 'Sort by AI'}
+                    </button>
                 )}
                 <button className="btn btn-refresh-lg" onClick={() => refreshData(true)} title="Refresh now">↻</button>
                 {lastUpdated && <span className={`last-updated ${Date.now() - lastUpdated > 60000 ? 'stale' : ''}`}>Updated {lastUpdated.toLocaleTimeString()}</span>}

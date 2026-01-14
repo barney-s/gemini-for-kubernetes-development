@@ -16,6 +16,7 @@ func (s *Server) getSettings(c *gin.Context) {
 		"manual_pat_set":     false,
 		"oauth_pat_set":      false,
 		"gemini_api_key_set": false,
+		"sort_prompt_set":    false,
 		"github_pat_set":     false, // Legacy field for UI compatibility
 	}
 
@@ -41,6 +42,9 @@ func (s *Server) getSettings(c *gin.Context) {
 		if val, ok := sec.Data["gemini"]; ok && len(val) > 0 {
 			settings["gemini_api_key_set"] = true
 		}
+		if val, ok := sec.Data[k8s.SortPromptKey]; ok && len(val) > 0 {
+			settings["sort_prompt_set"] = true
+		}
 	}
 	c.JSON(http.StatusOK, settings)
 }
@@ -50,6 +54,7 @@ func (s *Server) updateSettings(c *gin.Context) {
 	var payload struct {
 		GithubPAT    *string `json:"github_pat"` // Use pointer to distinguish between empty string and missing field
 		GeminiAPIKey string  `json:"gemini_api_key"`
+		SortPrompt   *string `json:"sort_prompt"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -90,6 +95,23 @@ func (s *Server) updateSettings(c *gin.Context) {
 		if err != nil {
 			klog.Infof("Failed to update Gemini API Key: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Gemini API Key"})
+			return
+		}
+	}
+
+	if payload.SortPrompt != nil {
+		promptValue := *payload.SortPrompt
+		data := map[string][]byte{
+			k8s.SortPromptKey: []byte(promptValue),
+		}
+		if promptValue == "" {
+			data[k8s.SortPromptKey] = nil
+		}
+
+		err := s.K8sManager.UpdateSecret(c.Request.Context(), namespace, k8s.GeminiSecretName, data, nil)
+		if err != nil {
+			klog.Infof("Failed to update Sort Prompt: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Sort Prompt"})
 			return
 		}
 	}

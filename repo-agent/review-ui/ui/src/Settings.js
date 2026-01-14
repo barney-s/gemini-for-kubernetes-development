@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 function Settings({ onBack }) {
     const [githubPat, setGithubPat] = useState('');
     const [geminiKey, setGeminiKey] = useState('');
-    const [status, setStatus] = useState({ github_pat_set: false, gemini_api_key_set: false });
+    const [sortPrompt, setSortPrompt] = useState('');
+    const [status, setStatus] = useState({ github_pat_set: false, gemini_api_key_set: false, sort_prompt_set: false });
     const [isLoading, setIsLoading] = useState(true);
     const [message, setMessage] = useState({ text: '', type: '' }); // type: 'success' or 'error'
 
@@ -27,6 +28,17 @@ function Settings({ onBack }) {
         const payload = {};
         if (githubPat) payload.github_pat = githubPat;
         if (geminiKey) payload.gemini_api_key = geminiKey;
+        if (sortPrompt !== '') payload.sort_prompt = sortPrompt; // Only send if user typed something. Empty string to clear is handled by separate button or if user explicitly clears it? 
+        // Actually, if user wants to clear, they might delete text and save. 
+        // But here I'm using placeholder behavior for "set". 
+        // If I want to allow clearing by saving empty string, I need to know if user intended to change it.
+        // Let's assume if it's empty, we don't send it unless we have a specific "Clear" action, 
+        // OR we can just allow overwriting.
+        // For simplicity, let's treat non-empty input as update. 
+        // Clearing is better handled by a clear button for "password" like fields, but Sort Prompt is text.
+        // Let's allow updating with text. To clear, we can add a Clear button.
+        
+        if (sortPrompt) payload.sort_prompt = sortPrompt;
 
         if (Object.keys(payload).length === 0) {
              setMessage({ text: 'Nothing to update.', type: 'info' });
@@ -43,6 +55,7 @@ function Settings({ onBack }) {
                 setMessage({ text: 'Settings updated successfully!', type: 'success' });
                 setGithubPat('');
                 setGeminiKey('');
+                setSortPrompt('');
                 // Refresh status
                 fetch('/api/settings').then(r => r.json()).then(setStatus);
             } else {
@@ -56,7 +69,7 @@ function Settings({ onBack }) {
     };
 
     const handleClearPat = () => {
-        if (!window.confirm("Are you sure you want to clear your manual PAT? The application will fall back to your OAuth login token if available.")) return;
+        if (!window.confirm("Are you sure you want to clear your manual PAT?")) return;
         
         fetch('/api/settings', {
             method: 'POST',
@@ -72,6 +85,25 @@ function Settings({ onBack }) {
             }
         })
         .catch(err => setMessage({ text: 'Error clearing PAT.', type: 'error' }));
+    };
+
+    const handleClearSortPrompt = () => {
+        if (!window.confirm("Are you sure you want to clear your custom Sort Prompt?")) return;
+
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sort_prompt: "" })
+        })
+        .then(res => {
+            if (res.ok) {
+                setMessage({ text: 'Sort Prompt cleared.', type: 'success' });
+                fetch('/api/settings').then(r => r.json()).then(setStatus);
+            } else {
+                throw new Error('Failed to clear Sort Prompt');
+            }
+        })
+        .catch(err => setMessage({ text: 'Error clearing Sort Prompt.', type: 'error' }));
     };
 
     if (isLoading) return <div className="settings-container"><p>Loading settings...</p></div>;
@@ -131,6 +163,27 @@ function Settings({ onBack }) {
                         </span>
                     </div>
                     <small>Required for AI-powered reviews and triage.</small>
+                </div>
+
+                <div className="form-group">
+                    <label htmlFor="sortPrompt">Custom Sort Prompt (AI):</label>
+                    <div className="input-status-wrapper">
+                         <textarea
+                            id="sortPrompt"
+                            value={sortPrompt}
+                            onChange={(e) => setSortPrompt(e.target.value)}
+                            placeholder={status.sort_prompt_set ? "(Currently set - leave blank to keep)" : "Enter custom prompt for sorting PRs (e.g., 'Prioritize security fixes...')"}
+                            rows="4"
+                            style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}}
+                        />
+                         <span className={`status-badge ${status.sort_prompt_set ? 'set' : 'missing'}`} style={{alignSelf: 'flex-start', marginTop: '10px'}}>
+                            {status.sort_prompt_set ? '✅ Configured' : 'Using Default'}
+                        </span>
+                         {status.sort_prompt_set && (
+                            <button type="button" className="btn btn-delete btn-sm" onClick={handleClearSortPrompt} style={{marginLeft: '10px', alignSelf: 'flex-start', marginTop: '10px'}}>Clear</button>
+                        )}
+                    </div>
+                    <small>Customize how the AI ranks Pull Requests.</small>
                 </div>
 
                 <div className="form-actions">
