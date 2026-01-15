@@ -26,6 +26,8 @@ type PR struct {
 	AgentStateMessage string   `json:"agentStateMessage,omitempty"`
 	ReviewState       string   `json:"reviewState,omitempty"`
 	Labels            []string `json:"labels,omitempty"`
+	AIPriority        string   `json:"aiPriority,omitempty"`
+	AIRationale       string   `json:"aiRationale,omitempty"`
 }
 
 // Issue represents a GitHub issue

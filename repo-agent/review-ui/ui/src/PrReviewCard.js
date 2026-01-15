@@ -409,12 +409,29 @@ function PrReviewCard({
   return (
     <div key={pr.id} className={`pr-card ${pr.review ? 'review-submitted' : ''}`}>
       <div className="pr-card-header" onClick={() => toggleCollapse(pr.id)}>
-        <h3>
-          <a href={pr.htmlURL} target="_blank" rel="noopener noreferrer">{pr.title} (PR #{pr.id})</a>
-          <span style={{ marginLeft: '10px', fontSize: 'small', color: '#555' }}>
-            {collapsedReviews[pr.id] ? 'click to expand' : 'click to collapse'}
-          </span>
-        </h3>
+        <div style={{display: 'flex', flexDirection: 'column'}}>
+            <h3>
+            <a href={pr.htmlURL} target="_blank" rel="noopener noreferrer">{pr.title} (PR #{pr.id})</a>
+            <span style={{ marginLeft: '10px', fontSize: 'small', color: '#555' }}>
+                {collapsedReviews[pr.id] ? 'click to expand' : 'click to collapse'}
+            </span>
+            </h3>
+            {pr.aiPriority && (
+                <div style={{marginTop: '5px', fontSize: '0.9em', display: 'flex', alignItems: 'center'}}>
+                    <span style={{fontWeight: 'bold', marginRight: '5px'}}>Priority:</span>
+                    <span style={{
+                        padding: '2px 6px', 
+                        borderRadius: '4px', 
+                        backgroundColor: pr.aiPriority === 'High' ? '#ffcccc' : pr.aiPriority === 'Medium' ? '#fff3cd' : '#d1e7dd',
+                        color: pr.aiPriority === 'High' ? '#842029' : pr.aiPriority === 'Medium' ? '#664d03' : '#0f5132',
+                        marginRight: '10px'
+                    }}>
+                        {pr.aiPriority}
+                    </span>
+                    <span style={{color: '#666', fontStyle: 'italic'}}>{pr.aiRationale}</span>
+                </div>
+            )}
+        </div>
         <div className="pr-card-actions-header">
           {pr.labels && pr.labels.length > 0 && (
             <div style={{ display: 'flex', gap: '5px', marginRight: '10px' }}>

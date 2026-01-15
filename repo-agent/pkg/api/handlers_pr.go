@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gke-labs/gemini-for-kubernetes-development/repo-agent/pkg/auth"
 	"github.com/gke-labs/gemini-for-kubernetes-development/repo-agent/pkg/clients"
+	"github.com/gke-labs/gemini-for-kubernetes-development/repo-agent/pkg/k8s"
+	"github.com/gke-labs/gemini-for-kubernetes-development/repo-agent/pkg/llm"
 	"github.com/gke-labs/gemini-for-kubernetes-development/repo-agent/pkg/models"
 	"github.com/google/go-github/v39/github"
 	yaml "go.yaml.in/yaml/v3"
@@ -18,6 +22,146 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 )
+
+func (s *Server) sortPRs(c *gin.Context) {
+	log := klog.FromContext(c.Request.Context())
+	namespace := c.MustGet(auth.UserKey).(string)
+	repo := c.Param("repo")
+
+	// Fetch PRs first (ensure they are populated)
+	s.fetchAndPopulatePRs(c.Request.Context(), namespace, repo)
+	prs, err := s.Store.ListPRs(c.Request.Context(), namespace, repo)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list PRs"})
+		return
+	}
+
+	if len(prs) == 0 {
+		c.JSON(http.StatusOK, prs)
+		return
+	}
+
+	// Get RepoWatch to find ConfigDir for instructions
+	rw, err := s.K8sManager.GetRepoWatch(c.Request.Context(), namespace, repo)
+	if err != nil {
+		log.Info("Failed to get RepoWatch", "err", err)
+		// proceed without custom instructions
+	}
+
+	var userInstructions string
+	if rw != nil {
+		configDirRef, found, _ := unstructured.NestedString(rw.Object, "spec", "review", "llm", "configdirRef")
+		if found {
+			cd, err := s.K8sManager.GetConfigDir(c.Request.Context(), namespace, configDirRef)
+			if err == nil {
+				files, found, _ := unstructured.NestedSlice(cd.Object, "spec", "files")
+				if found {
+					for _, f := range files {
+						fileMap, ok := f.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						path, _, _ := unstructured.NestedString(fileMap, "path")
+						content, _, _ := unstructured.NestedString(fileMap, "source", "inline")
+						if path == ".gemini/user-instructions.json" {
+							userInstructions = content
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Build Prompt
+	var prListBuilder strings.Builder
+	for _, pr := range prs {
+		prListBuilder.WriteString(fmt.Sprintf("- ID: %s, Title: %s\n", pr.ID, pr.Title))
+	}
+
+	prompt := fmt.Sprintf(`You are a helpful assistant that helps prioritize Pull Requests.
+Here is the list of active PRs:
+%s
+
+User specific instructions for prioritization:
+%s
+
+Please rank these PRs by priority (High, Medium, Low) and provide a short rationale.
+Return the result as a raw JSON list of objects (no markdown formatting) with fields: id (string), priority (string), rationale (string).
+Example: [{"id": "1", "priority": "High", "rationale": "Urgent fix"}]`, prListBuilder.String(), userInstructions)
+
+	// Get Gemini Key
+	secret, err := s.K8sManager.Clientset.CoreV1().Secrets(namespace).Get(c.Request.Context(), k8s.GeminiSecretName, v1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Gemini API Key"})
+		return
+	}
+	apiKey := string(secret.Data["gemini"])
+	if apiKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Gemini API Key not set"})
+		return
+	}
+
+	// Call LLM
+	resp, err := llm.GenerateContent(c.Request.Context(), apiKey, "gemini-1.5-pro", prompt)
+	if err != nil {
+		log.Info("LLM generation failed", "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate priorities"})
+		return
+	}
+
+	// Parse response
+	// Clean up markdown code blocks if present
+	cleanedResp := strings.TrimSpace(resp)
+	cleanedResp = strings.TrimPrefix(cleanedResp, "```json")
+	cleanedResp = strings.TrimPrefix(cleanedResp, "```")
+	cleanedResp = strings.TrimSuffix(cleanedResp, "```")
+
+	var rankings []struct {
+		ID        string `json:"id"`
+		Priority  string `json:"priority"`
+		Rationale string `json:"rationale"`
+	}
+
+	if err := json.Unmarshal([]byte(cleanedResp), &rankings); err != nil {
+		log.Info("Failed to unmarshal LLM response", "resp", resp, "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse LLM response"})
+		return
+	}
+
+	// Update PRs
+	rankMap := make(map[string]struct{ Priority, Rationale string })
+	for _, r := range rankings {
+		rankMap[r.ID] = struct{ Priority, Rationale string }{r.Priority, r.Rationale}
+	}
+
+	for i, pr := range prs {
+		if r, ok := rankMap[pr.ID]; ok {
+			prs[i].AIPriority = r.Priority
+			prs[i].AIRationale = r.Rationale
+			// Save to store
+			_ = s.Store.SavePR(c.Request.Context(), namespace, repo, prs[i])
+		}
+	}
+
+	// Sort logic
+	// High > Medium > Low
+	priorityOrder := map[string]int{"High": 3, "Medium": 2, "Low": 1}
+
+	sort.Slice(prs, func(i, j int) bool {
+		p1 := priorityOrder[prs[i].AIPriority]
+		p2 := priorityOrder[prs[j].AIPriority]
+		if p1 != p2 {
+			return p1 > p2
+		}
+		// Secondary sort by ID desc
+		id1, _ := strconv.Atoi(prs[i].ID)
+		id2, _ := strconv.Atoi(prs[j].ID)
+		return id1 > id2
+	})
+
+	c.JSON(http.StatusOK, prs)
+}
 
 func (s *Server) getPRs(c *gin.Context) {
 	log := klog.FromContext(c.Request.Context())

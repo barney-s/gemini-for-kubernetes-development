@@ -1071,6 +1071,35 @@ function App() {
     }
   };
 
+  const handleSortPRs = () => {
+    if (!isAuthenticated && !isGuest) return;
+    if (!activeRepo) return;
+    
+    // Show loading state? 
+    // Maybe just disable the button or show a toast
+    const btn = document.getElementById('btn-sort-ai');
+    if (btn) btn.disabled = true;
+    if (btn) btn.innerText = "Sorting...";
+
+    fetch(`/api/repo/${activeRepo.name}/prs/sort`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (btn) btn.disabled = false;
+        if (btn) btn.innerText = "Sort by AI";
+
+        if (data.error) {
+            alert("Failed to sort: " + data.error);
+        } else {
+            setPrs(data);
+        }
+      })
+      .catch(err => {
+        if (btn) btn.disabled = false;
+        if (btn) btn.innerText = "Sort by AI";
+        console.error("Failed to sort PRs:", err);
+      });
+  };
+
   const renderDashboard = () => (
     <>
       <nav className="repo-tabs">
@@ -1128,6 +1157,9 @@ function App() {
                     </span>
                 )}
                 <button className="btn btn-refresh-lg" onClick={() => refreshData(true)} title="Refresh now">↻</button>
+                {activeSubTab.name === 'review' && (
+                    <button id="btn-sort-ai" className="btn" onClick={handleSortPRs} style={{marginLeft: '10px', backgroundColor: '#673ab7', color: 'white'}}>Sort by AI</button>
+                )}
                 {lastUpdated && <span className={`last-updated ${Date.now() - lastUpdated > 60000 ? 'stale' : ''}`}>Updated {lastUpdated.toLocaleTimeString()}</span>}
                 <button className="btn" onClick={() => setView('update_repo')} style={{marginLeft: '10px', marginRight: '10px'}}>
                     Repo Settings
