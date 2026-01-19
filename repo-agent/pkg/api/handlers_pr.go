@@ -96,6 +96,7 @@ func (s *Server) fetchAndPopulatePRs(ctx context.Context, namespace, repo string
 		agentState := ""
 		agentStateMessage := ""
 		reviewState := ""
+		summary := ""
 		var labels []string
 		annotations := item.GetAnnotations()
 		if annotations == nil {
@@ -116,6 +117,9 @@ func (s *Server) fetchAndPopulatePRs(ctx context.Context, namespace, repo string
 			if val, ok := annotations["agentLabels"]; ok {
 				_ = json.Unmarshal([]byte(val), &labels)
 			}
+			if val, ok := annotations["agentSummary"]; ok {
+				summary = val
+			}
 		}
 
 		pr := models.PR{
@@ -131,6 +135,7 @@ func (s *Server) fetchAndPopulatePRs(ctx context.Context, namespace, repo string
 			AgentStateMessage: agentStateMessage,
 			ReviewState:       reviewState,
 			Labels:            labels,
+			Summary:           summary,
 		}
 
 		if err := s.Store.SavePR(ctx, namespace, repo, pr); err != nil {

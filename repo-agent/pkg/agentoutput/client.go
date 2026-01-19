@@ -120,6 +120,42 @@ func SetAgentDraft(ctx context.Context, gvr schema.GroupVersionResource, draft s
 	return nil
 }
 
+// SetAgentSummary updates the agentSummary annotation.
+func SetAgentSummary(ctx context.Context, gvr schema.GroupVersionResource, summary string) error {
+	log := klog.FromContext(ctx)
+	dc, name, namespace, err := getClient()
+	if err != nil {
+		return err
+	}
+
+	obj, err := dc.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	applyObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": obj.GetAPIVersion(),
+			"kind":       obj.GetKind(),
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": namespace,
+				"annotations": map[string]string{
+					"agentSummary": summary,
+				},
+			},
+		},
+	}
+
+	log.Info("applying resource with summary", "namespace", namespace, "name", name)
+	_, err = dc.Resource(gvr).Namespace(namespace).Apply(ctx, name, applyObj, metav1.ApplyOptions{FieldManager: "agent-summary-client", Force: true})
+	if err != nil {
+		log.Info("error applying resource", "namespace", namespace, "name", name, "err", err)
+		return err
+	}
+	return nil
+}
+
 // SetAgentLabel replaces the agentLabels annotation with the provided labels.
 func SetAgentLabel(gvr schema.GroupVersionResource, labels []string) error {
 	dc, name, namespace, err := getClient()

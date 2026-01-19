@@ -384,6 +384,13 @@ func (c *ReviewCommand) Run(ctx context.Context) error {
 			if agentOutput.Note != "" {
 				accumulatedAgentOutput.Note += "\n--- " + agentOutput.Note
 			}
+			if agentOutput.Summary != "" {
+				if accumulatedAgentOutput.Summary == "" {
+					accumulatedAgentOutput.Summary = agentOutput.Summary
+				} else {
+					accumulatedAgentOutput.Summary += "\n--- " + agentOutput.Summary
+				}
+			}
 			if agentOutput.Review.Body != nil && *agentOutput.Review.Body != "" {
 				if accumulatedAgentOutput.Review.Body == nil {
 					accumulatedAgentOutput.Review.Body = agentOutput.Review.Body
@@ -418,6 +425,14 @@ func (c *ReviewCommand) Run(ctx context.Context) error {
 		}
 		accumulatedAgentOutput.Note = combinedNote
 
+		combinedSummary, err := dedupeAndCombineText(provider, accumulatedAgentOutput.Summary)
+		if err != nil {
+			log.Info("Failed to dedupe and combine Summary. Using original Summary.", "error", err)
+		} else {
+			accumulatedAgentOutput.Summary = combinedSummary
+			log.Info("Successfully deduped and combined Summary.")
+		}
+
 		combinedBody, err := dedupeAndCombineText(provider, *accumulatedAgentOutput.Review.Body)
 		if err != nil {
 			log.Info("Failed to dedupe and combine Body. Using original Body.", "error", err)
@@ -442,6 +457,9 @@ func (c *ReviewCommand) Run(ctx context.Context) error {
 	accumulatedAgentOutput.Labels = append(accumulatedAgentOutput.Labels, diffSizeLabel)
 	if err := agentoutput.AddAgentLabel(ReviewGVR, accumulatedAgentOutput.Labels); err != nil {
 		log.Error(err, "Failed to add agent labels")
+	}
+	if err := agentoutput.SetAgentSummary(ctx, ReviewGVR, accumulatedAgentOutput.Summary); err != nil {
+		log.Error(err, "Failed to set agent summary")
 	}
 	log.Info("Wrote agent output", "filename", filename)
 

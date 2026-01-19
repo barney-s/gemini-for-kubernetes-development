@@ -418,21 +418,24 @@ function PrReviewCard({
         <div className="pr-card-actions-header">
           {pr.labels && pr.labels.length > 0 && (
             <div style={{ display: 'flex', gap: '5px', marginRight: '10px' }}>
-              {pr.labels.map((label, index) => (
+              {pr.labels.map((label, index) => {
+                const isSize = label.startsWith('size/');
+                return (
                 <span
                   key={index}
                   style={{
-                    backgroundColor: '#eee',
-                    color: '#333',
+                    backgroundColor: isSize ? '#e3f2fd' : '#eee',
+                    color: isSize ? '#0d47a1' : '#333',
                     padding: '2px 6px',
                     borderRadius: '4px',
                     fontSize: 'small',
-                    border: '1px solid #ddd'
+                    border: '1px solid #ddd',
+                    fontWeight: isSize ? 'bold' : 'normal'
                   }}
                 >
                   {label}
                 </span>
-              ))}
+              )})}
             </div>
           )}
           {reviewFlairText && pr.agentState !== 'provisioning' && (
@@ -471,6 +474,11 @@ function PrReviewCard({
           <button className="btn btn-delete" style={{ fontSize: '14px', padding: '4px 10px' }} onClick={(e) => { e.stopPropagation(); handleDelete(pr.id); }}>&#x2715;</button>
         </div>
       </div>
+      {pr.summary && (
+        <div style={{padding: '0 20px 10px 20px', color: '#555', fontSize: '0.9em'}} onClick={() => toggleCollapse(pr.id)}>
+           <strong>Assessment: </strong>{pr.summary}
+        </div>
+      )}
       {!collapsedReviews[pr.id] && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 0' }}>

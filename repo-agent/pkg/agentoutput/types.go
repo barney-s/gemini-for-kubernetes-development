@@ -10,7 +10,8 @@ type AgentOutput struct {
 
 // ReviewAgentOutput defines the structure for the review agent's YAML output.
 type ReviewAgentOutput struct {
-	Labels []string                         `yaml:"labels,omitempty"`
-	Note   string                           `yaml:"note,omitempty"`
-	Review *github.PullRequestReviewRequest `yaml:"review,omitempty"`
+	Labels  []string                         `yaml:"labels,omitempty"`
+	Note    string                           `yaml:"note,omitempty"`
+	Summary string                           `yaml:"summary,omitempty"`
+	Review  *github.PullRequestReviewRequest `yaml:"review,omitempty"`
 }

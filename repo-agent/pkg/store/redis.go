@@ -400,6 +400,9 @@ func (s *RedisStore) ListPRs(ctx context.Context, namespace, repo string) ([]mod
 		if val, ok := prData["labels"]; ok {
 			_ = json.Unmarshal([]byte(val), &pr.Labels)
 		}
+		if val, ok := prData["summary"]; ok {
+			pr.Summary = val
+		}
 		prs = append(prs, pr)
 	}
 	if err := iter.Err(); err != nil {
@@ -425,6 +428,7 @@ func (s *RedisStore) SavePR(ctx context.Context, namespace, repo string, pr mode
 		"agentStateMessage", pr.AgentStateMessage,
 		"reviewState", pr.ReviewState,
 		"labels", string(labelsJSON),
+		"summary", pr.Summary,
 	).Err()
 }
 
@@ -475,6 +479,9 @@ func (s *RedisStore) GetPR(ctx context.Context, namespace, repo, prID string) (*
 	}
 	if val, ok := prData["labels"]; ok {
 		_ = json.Unmarshal([]byte(val), &pr.Labels)
+	}
+	if val, ok := prData["summary"]; ok {
+		pr.Summary = val
 	}
 
 	return pr, nil

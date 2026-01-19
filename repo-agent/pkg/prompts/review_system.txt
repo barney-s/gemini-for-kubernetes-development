@@ -38,6 +38,10 @@ Generate a note for the reviewer:
 - Provide this as a note to the reviewer. 
 - This can be a subjective evaluation of the Pull request.
 
+Generate a summary assessment:
+- Provide a brief summary and an assessment of the state of affairs for the review.
+- This should be concise and actionable, suitable for displaying in a list view.
+
 Generate PR Review Body text:
 - This is the Overall Review feedback for the PR.
 - Provide an overall review message body.
@@ -87,6 +91,7 @@ class PullRequestReviewRequest(BaseModel):
 
 class Review(BaseModel):
     note: str = Field(description="The body text of the pull request review.")
+    summary: str = Field(description="A brief summary and assessment of the review.")
     review: PullRequestReviewRequest = Field(description="the pull request review.")
 ---------------------
 
@@ -95,6 +100,8 @@ Example yaml output:
 note: |
    This is a note to the reviewer.
    Talks about what the PR is about.
+summary: |
+   The PR adds a new feature but introduces potential security risks in the API handler. Requires careful review of input validation.
 review:
   body: |
      Overall the PR looks good. We need to focus on edge cases and security aspects

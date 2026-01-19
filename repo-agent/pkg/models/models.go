@@ -6,9 +6,10 @@ import (
 
 // ReviewAgentOutput defines the structure for the agent's YAML output.
 type ReviewAgentOutput struct {
-	Note   string                           `yaml:"note"`
-	Review *github.PullRequestReviewRequest `yaml:"review"`
-	Labels []string                         `yaml:"labels,omitempty"`
+	Note    string                           `yaml:"note"`
+	Summary string                           `yaml:"summary"`
+	Review  *github.PullRequestReviewRequest `yaml:"review"`
+	Labels  []string                         `yaml:"labels,omitempty"`
 }
 
 // PR represents a pull request
@@ -26,6 +27,7 @@ type PR struct {
 	AgentStateMessage string   `json:"agentStateMessage,omitempty"`
 	ReviewState       string   `json:"reviewState,omitempty"`
 	Labels            []string `json:"labels,omitempty"`
+	Summary           string   `json:"summary,omitempty"`
 }
 
 // Issue represents a GitHub issue
