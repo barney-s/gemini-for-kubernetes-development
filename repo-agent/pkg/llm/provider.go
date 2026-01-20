@@ -69,6 +69,7 @@ func NewLLMProvider(cfg ProviderConfig) (Provider, error) {
 			ProviderConfig: cfg,
 		}
 		g.AddPostProcessor(StripYAMLMarkers)
+		g.AddPostProcessor(StripThoughts())
 		if cfg.OutputStartIndicator != "" {
 			g.AddPostProcessor(StripUnillStartIndicator(cfg.OutputStartIndicator))
 			g.AddPostProcessor(StripIWillStatements())

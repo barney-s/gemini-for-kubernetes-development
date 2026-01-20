@@ -229,3 +229,22 @@ func StripIWillStatements() PostProcessor {
 		return bytes.Join(lines[start:], nil), nil
 	}
 }
+
+func StripThoughts() PostProcessor {
+	return func(input []byte) ([]byte, error) {
+		trimmed := bytes.TrimLeft(input, " \t\r\n")
+		if !bytes.HasPrefix(trimmed, []byte("Thoughts:")) {
+			return input, nil
+		}
+
+		// Find the first occurrence of double newlines which likely separates thoughts from the response
+		// Handle \n\n
+		sep := []byte("\n\n")
+		idx := bytes.Index(trimmed, sep)
+		if idx != -1 {
+			return bytes.TrimSpace(trimmed[idx+len(sep):]), nil
+		}
+
+		return input, nil
+	}
+}
