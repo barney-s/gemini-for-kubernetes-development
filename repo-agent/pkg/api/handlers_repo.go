@@ -207,6 +207,9 @@ spec:
           software.
           5. other: Any issue that does not fit into the above categories.
 
+          Do not attempt to fix the issue or generate code. Your only task is to
+          categorize the issue.
+
           Start the response with "/kind <Category>" where <Category> is one of
           bug , feature , document, support, cleanup or other
           In the next line, provide a concise explanation of your reasoning for
@@ -215,6 +218,7 @@ spec:
           Issue Title: "{{.Title}}"
           Issue Body: "{{.Body}}"
           HTML URL: "{{.HTMLURL}}"
+        
       name: triage
 `
 	c.JSON(http.StatusOK, gin.H{"yaml": defaultRepoWatch})

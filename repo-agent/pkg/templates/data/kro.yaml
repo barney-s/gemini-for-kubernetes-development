@@ -53,6 +53,9 @@ spec:
           regarding the use of the software. 5. other: Any issue that does not
           fit into the above categories.
 
+          Do not attempt to fix the issue or generate code. Your only task is to
+          categorize the issue.
+
           Start the response with "/kind <Category>" where <Category> is one of
           bug , feature , document, support, cleanup or other In the next line,
           provide a concise explanation of your reasoning for the assigned
