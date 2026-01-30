@@ -309,6 +309,8 @@ spec:
                 provide a concise explanation of your reasoning for the assigned
                 category.
       
+                Please provide the response in a YAML code block.
+
                 Issue Title: "{{.Title}}" Issue Body: "{{.Body}}" HTML URL:
                 "{{.HTMLURL}}"
         name: triage
