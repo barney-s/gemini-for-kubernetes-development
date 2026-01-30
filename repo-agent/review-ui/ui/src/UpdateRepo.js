@@ -307,7 +307,7 @@ function UpdateRepo({ repo, onCancel, onRepoUpdated, onRepoDeleted }) {
                 <div style={{border: '1px solid #d9534f', padding: '15px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                     <div>
                         <strong>Delete repowatch</strong>
-                        <p style={{margin: '5px 0 0 0', fontSize: '0.9em', color: '#666'}}>
+                        <p className="text-muted" style={{margin: '5px 0 0 0', fontSize: '0.9em'}}>
                             Unsubmitted reviews would be deleted. You can always add the repo again.
                         </p>
                     </div>

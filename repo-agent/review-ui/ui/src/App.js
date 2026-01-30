@@ -1088,8 +1088,8 @@ function App() {
                     <button className="btn" onClick={() => { setNewDevBranch(''); setDevModalOpen(true); }} title="Create new Dev Sandbox" style={{fontSize: '24px', width: '50px', height: '50px', borderRadius: '25px', lineHeight: '24px'}}>+</button>
                 </div>
                 {devModalOpen && (
-                  <div className="modal-overlay" onClick={() => setDevModalOpen(false)} style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000}}>
-                      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{backgroundColor: '#fff', padding: '20px', borderRadius: '5px', width: '800px', display: 'flex', flexDirection: 'column', gap: '10px', color: 'black'}}>
+                  <div className="modal-overlay" onClick={() => setDevModalOpen(false)}>
+                      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                           <h4>New Dev Sandbox Task</h4>
                           <input type="text" placeholder="New Branch Name" value={newDevBranch} onChange={(e) => setNewDevBranch(e.target.value)} style={{padding: '5px', border: '1px solid #ccc'}} />
                           <textarea placeholder="Prompt" value={newDevPrompt} onChange={(e) => setNewDevPrompt(e.target.value)} rows="15" style={{padding: '5px', border: '1px solid #ccc'}} />
@@ -1237,7 +1237,7 @@ function App() {
       </header>
       
       {(isAuthenticated || isGuest) && !isGeminiKeySet && (
-        <div className="warning-banner" style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '10px', textAlign: 'center', borderBottom: '1px solid #ffeeba' }}>
+        <div className="warning-banner">
           <strong>⚠️ Gemini API Key Missing:</strong> Please configure your Gemini API Key in <a href="#" onClick={(e) => { e.preventDefault(); setView('settings'); }}>Settings</a> to enable code reviews and issue handling.
         </div>
       )}
@@ -1248,8 +1248,8 @@ function App() {
       {view === 'update_repo' && <UpdateRepo repo={activeRepo} onCancel={() => setView('dashboard')} onRepoUpdated={() => { fetchRepos(); setView('dashboard'); }} onRepoDeleted={handleRepoDeleted} />}
 
       {feedbackModalOpen && (
-        <div className="modal-overlay" onClick={() => setFeedbackModalOpen(false)} style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000}}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{backgroundColor: '#fff', padding: '20px', borderRadius: '5px', width: '800px', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', color: 'black'}}>
+        <div className="modal-overlay" onClick={() => setFeedbackModalOpen(false)} style={{zIndex: 2000}}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <h4>Send Feedback</h4>
                 {feedbackImage && (
                     <>

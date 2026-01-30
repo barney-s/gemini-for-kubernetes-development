@@ -422,7 +422,7 @@ function TaskReviewCard({
                         {fileComments.length}
                       </span>
                     )}
-                    <span style={{ marginLeft: '10px', fontSize: 'small', color: '#555' }}>
+                    <span className="text-muted" style={{ marginLeft: '10px', fontSize: 'small' }}>
                       {isFileCollapsed ? 'click to expand' : 'click to collapse'}
                     </span>
                   </div>
@@ -444,12 +444,12 @@ function TaskReviewCard({
                             >
                               {isSubmitted ? (
                                 <>
-                                  {comment.line && <p style={{fontSize: 'small', color: '#555', marginBottom: '5px'}}>Line: {comment.line} ({comment.side || 'RIGHT'})</p>}
+                                  {comment.line && <p className="text-muted" style={{fontSize: 'small', marginBottom: '5px'}}>Line: {comment.line} ({comment.side || 'RIGHT'})</p>}
                                   <pre className="review-pre">{comment.body}</pre>
                                 </>
                               ) : (
                                 <>
-                                  {comment.line && <p style={{fontSize: 'small', color: '#555', marginBottom: '5px'}}>Line: {comment.line} ({comment.side || 'RIGHT'})</p>}
+                                  {comment.line && <p className="text-muted" style={{fontSize: 'small', marginBottom: '5px'}}>Line: {comment.line} ({comment.side || 'RIGHT'})</p>}
                                   <textarea
                                     className="review-textarea"
                                     value={comment.body || ''}
@@ -475,14 +475,14 @@ function TaskReviewCard({
       };
 
     return (
-        <div style={{border: '1px solid #ddd', borderRadius: '5px', margin: '10px 0', backgroundColor: '#f9f9f9'}}>
+        <div className="task-card">
             <div 
-                style={{padding: '10px', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: '#eee'}}
+                className="task-header"
                 onClick={() => setTaskCollapsed(!taskCollapsed)}
             >
                 <div>
                     <strong>{task.type.toUpperCase()}</strong> - {new Date(task.creationTimestamp).toLocaleString()}
-                    <span style={{ marginLeft: '10px', fontSize: 'small', color: '#555' }}>
+                    <span className="text-muted" style={{ marginLeft: '10px', fontSize: 'small' }}>
                         {taskCollapsed ? 'click to expand' : 'click to collapse'}
                     </span>
                 </div>
@@ -497,7 +497,7 @@ function TaskReviewCard({
             </div>
             
             {!taskCollapsed && (
-                <div style={{padding: '15px'}}>
+                <div className="task-content">
                      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 0', gap: '10px' }}>
                         <button className="btn" onClick={() => setShowLogs(!showLogs)}>
                             {showLogs ? 'Hide Logs' : 'View Logs'}
@@ -507,7 +507,7 @@ function TaskReviewCard({
                         </button>
                     </div>
                      {showLogs && (
-                        <div className="logs-display" style={{backgroundColor: '#333', color: '#fff', padding: '10px', borderRadius: '5px', marginBottom: '10px', maxHeight: '300px', overflowY: 'auto'}}>
+                        <div className="logs-display">
                             <pre style={{margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'monospace'}}>{logs || 'Loading logs...'}</pre>
                         </div>
                      )}
@@ -781,7 +781,7 @@ function PrReviewCard({
         <h3>
           <a href={pr.htmlURL} target="_blank" rel="noopener noreferrer">{pr.title} (PR #{pr.id})</a>
           {!isMainView && (
-            <span style={{ marginLeft: '10px', fontSize: 'small', color: '#555' }}>
+            <span className="text-muted" style={{ marginLeft: '10px', fontSize: 'small' }}>
               {collapsedReviews[pr.id] ? 'click to expand' : 'click to collapse'}
             </span>
           )}
@@ -792,14 +792,7 @@ function PrReviewCard({
               {pr.labels.map((label, index) => (
                 <span
                   key={index}
-                  style={{
-                    backgroundColor: '#eee',
-                    color: '#333',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    fontSize: 'small',
-                    border: '1px solid #ddd'
-                  }}
+                  className="pr-label"
                 >
                   {label}
                 </span>
@@ -874,7 +867,7 @@ function PrReviewCard({
                     {!showNewTaskForm ? (
                         <button className="btn" onClick={() => setShowNewTaskForm(true)}>Review Again</button>
                     ) : (
-                        <div className="new-task-form" style={{padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '5px'}}>
+                        <div className="new-task-form">
                             <h4>Request New Review Task</h4>
                             <textarea 
                                 className="review-textarea"

@@ -105,14 +105,14 @@ function TaskIssueCard({
     };
 
     return (
-        <div style={{border: '1px solid #ddd', borderRadius: '5px', margin: '10px 0', backgroundColor: '#f9f9f9'}}>
+        <div className="task-card">
             <div 
-                style={{padding: '10px', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: '#eee'}}
+                className="task-header"
                 onClick={() => setIsCollapsed(!isCollapsed)}
             >
                 <div>
                     <strong>{task.name.split('-').pop().toUpperCase()}</strong> {/* Display generic name like TRIAGE */}
-                    <span style={{ fontSize: 'small', color: '#555', marginLeft: '10px' }}>
+                    <span className="text-muted" style={{ fontSize: 'small', marginLeft: '10px' }}>
                         {new Date(task.creationTimestamp).toLocaleString()}
                     </span>
                 </div>
@@ -125,14 +125,14 @@ function TaskIssueCard({
             </div>
             
             {!isCollapsed && (
-                <div style={{padding: '15px'}}>
+                <div className="task-content">
                     <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 0', gap: '10px' }}>
                         <button className="btn" onClick={() => setShowLogs(!showLogs)}>
                             {showLogs ? 'Hide Logs' : 'View Logs'}
                         </button>
                     </div>
                     {showLogs && (
-                        <div className="logs-display" style={{backgroundColor: '#333', color: '#fff', padding: '10px', borderRadius: '5px', marginBottom: '10px', maxHeight: '300px', overflowY: 'auto'}}>
+                        <div className="logs-display">
                             <pre style={{margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'monospace'}}>{logs || 'Loading logs...'}</pre>
                         </div>
                     )}
@@ -198,7 +198,7 @@ function IssueCard({
         <h3>
           <a href={issue.htmlURL} target="_blank" rel="noopener noreferrer">{issue.title} (Issue #{issue.id})</a>
           {!isMainView && (
-            <span style={{ marginLeft: '10px', fontSize: 'small', color: '#555' }}>
+            <span className="text-muted" style={{ marginLeft: '10px', fontSize: 'small' }}>
                 {isCollapsed ? 'click to expand' : 'click to collapse'}
             </span>
           )}
@@ -209,14 +209,7 @@ function IssueCard({
               {issue.labels.map((label, index) => (
                 <span
                   key={index}
-                  style={{
-                    backgroundColor: '#eee',
-                    color: '#333',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    fontSize: 'small',
-                    border: '1px solid #ddd'
-                  }}
+                  className="pr-label"
                 >
                   {label}
                 </span>
