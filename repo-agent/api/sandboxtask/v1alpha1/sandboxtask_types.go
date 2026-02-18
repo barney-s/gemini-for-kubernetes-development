@@ -47,6 +47,10 @@ type SandboxTaskStatus struct {
 	// Result of the task execution
 	// +optional
 	Result string `json:"result,omitempty"`
+
+	// TaskRunnerPod is the name of the pod currently executing the task
+	// +optional
+	TaskRunnerPod string `json:"taskRunnerPod,omitempty"`
 }
 
 //+kubebuilder:object:root=true

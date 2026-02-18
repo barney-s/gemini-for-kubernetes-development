@@ -519,6 +519,17 @@ func (m *Manager) ListSandboxTasks(ctx context.Context, namespace, sandboxName s
 	return taskList, nil
 }
 
+func (m *Manager) PodExists(ctx context.Context, namespace, podName string) (bool, error) {
+	_, err := m.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, v1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (m *Manager) UpdateSandboxTaskUserDraft(ctx context.Context, namespace, taskName, userDraft string) error {
 	gvr := schema.GroupVersionResource{
 		Group:    "custom.agents.x-k8s.io",
@@ -606,7 +617,7 @@ func (m *Manager) CreateSandboxTask(ctx context.Context, namespace, sandboxName,
 	return err
 }
 
-func (m *Manager) UpdateSandboxTaskStatus(ctx context.Context, namespace, taskName, state, result string) error {
+func (m *Manager) UpdateSandboxTaskStatus(ctx context.Context, namespace, taskName, state, result, taskRunnerPod string) error {
 	klog.Infof("Updating task %s status to %s", taskName, state)
 
 	timestamp := time.Now().UTC().Format(time.RFC3339)
@@ -625,15 +636,21 @@ func (m *Manager) UpdateSandboxTaskStatus(ctx context.Context, namespace, taskNa
 		}
 	}
 
+	status := map[string]interface{}{
+		"taskState": state,
+		"result":    result,
+	}
+
+	if taskRunnerPod != "" {
+		status["taskRunnerPod"] = taskRunnerPod
+	}
+
 	applyObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "custom.agents.x-k8s.io/v1alpha1",
 			"kind":       "SandboxTask",
 			"metadata":   metadata,
-			"status": map[string]interface{}{
-				"taskState": state,
-				"result":    result,
-			},
+			"status":     status,
 		},
 	}
 

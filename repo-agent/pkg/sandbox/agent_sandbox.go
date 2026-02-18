@@ -71,14 +71,14 @@ func NewAgentSandbox(opt AgentSandboxOptions) (*unstructured.Unstructured, *core
 		resources.Limits[corev1.ResourceCPU] = resource.MustParse("4000m")
 	}
 	if _, ok := resources.Requests["ephemeral-storage"]; !ok {
-		size := "6Gi"
+		size := "20Gi"
 		if opt.DindSupport == DindSupportPrivileged {
 			size = "40Gi"
 		}
 		resources.Requests["ephemeral-storage"] = resource.MustParse(size)
 	}
 	if _, ok := resources.Limits["ephemeral-storage"]; !ok {
-		size := "6Gi"
+		size := "20Gi"
 		if opt.DindSupport == DindSupportPrivileged {
 			size = "40Gi"
 		}

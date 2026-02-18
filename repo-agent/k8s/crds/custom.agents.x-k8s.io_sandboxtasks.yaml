@@ -58,6 +58,8 @@ spec:
             properties:
               result:
                 type: string
+              taskRunnerPod:
+                type: string
               taskState:
                 default: Pending
                 type: string

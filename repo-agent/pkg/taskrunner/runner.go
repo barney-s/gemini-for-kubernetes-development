@@ -22,6 +22,7 @@ type TaskRunner struct {
 	manager     *k8s.Manager
 	namespace   string
 	sandboxName string
+	hostname    string
 	ao          *agentoutput.AgentOutput
 }
 
@@ -37,6 +38,8 @@ func NewTaskRunner(ao *agentoutput.AgentOutput) (*TaskRunner, error) {
 	if ns == "" || name == "" {
 		return nil, fmt.Errorf("NAMESPACE and NAME environment variables must be set")
 	}
+
+	hostname, _ := os.Hostname()
 
 	// Ensure cache and tmp directories exist on /workspaces
 	// This is important for Go builds to avoid ephemeral storage exhaustion
@@ -59,6 +62,7 @@ func NewTaskRunner(ao *agentoutput.AgentOutput) (*TaskRunner, error) {
 		manager:     k8s.NewManager(kubeClient),
 		namespace:   ns,
 		sandboxName: name,
+		hostname:    hostname,
 		ao:          ao,
 	}, nil
 }
@@ -94,6 +98,54 @@ func (tr *TaskRunner) processPendingTasks(ctx context.Context) {
 			// Process one task at a time for now
 			return
 		}
+
+		// Check for zombie tasks: if task is "Running" but pod is dead or it's us (from a previous run)
+		if taskState == "Running" {
+			isZombie := false
+			reason := ""
+			if task.Status.TaskRunnerPod == "" {
+				// No pod name, could be an old task from before this fix.
+				// We'll consider it a zombie if it's been running for too long (e.g. 1 hour)
+				if startTimeStr, ok := task.GetAnnotations()["sandbox.gemini.google.com/start-time"]; ok {
+					startTime, err := time.Parse(time.RFC3339, startTimeStr)
+					if err == nil {
+						if time.Since(startTime) > 1*time.Hour {
+							isZombie = true
+							reason = "running for more than 1 hour without TaskRunnerPod"
+						}
+					} else {
+						// Failed to parse start time, assume it's old and zombie
+						isZombie = true
+						reason = "unparseable start-time and no TaskRunnerPod"
+					}
+				} else {
+					// No start time and no pod name, assume it's a zombie
+					isZombie = true
+					reason = "no start-time and no TaskRunnerPod"
+				}
+			} else if task.Status.TaskRunnerPod == tr.hostname {
+				// It's us! But we are in processPendingTasks, which is synchronous and called from Run loop.
+				// If we were currently executing a task, we wouldn't be here.
+				isZombie = true
+				reason = "task assigned to current pod but runner is idle"
+			} else {
+				// Assigned to another pod, check if it still exists
+				exists, err := tr.manager.PodExists(ctx, tr.namespace, task.Status.TaskRunnerPod)
+				if err != nil {
+					klog.Errorf("Failed to check if pod %s exists: %v", task.Status.TaskRunnerPod, err)
+				} else if !exists {
+					isZombie = true
+					reason = fmt.Sprintf("assigned pod %s no longer exists", task.Status.TaskRunnerPod)
+				}
+			}
+
+			if isZombie {
+				klog.Infof("Found zombie task %s (reason: %s), re-executing", task.GetName(), reason)
+				tr.executeTask(ctx, &task)
+				return
+			}
+		}
+
 		klog.Infof("Skipping task %s with state %s", task.GetName(), taskState)
 	}
 }
@@ -262,7 +314,7 @@ func (tr *TaskRunner) executeTask(ctx context.Context, task *sandboxtaskv1alpha1
 }
 
 func (tr *TaskRunner) updateTaskStatus(ctx context.Context, task *sandboxtaskv1alpha1.SandboxTask, state, result string) {
-	if err := tr.manager.UpdateSandboxTaskStatus(ctx, tr.namespace, task.GetName(), state, result); err != nil {
+	if err := tr.manager.UpdateSandboxTaskStatus(ctx, tr.namespace, task.GetName(), state, result, tr.hostname); err != nil {
 		klog.Errorf("Failed to update task status: %v", err)
 	}
 }
