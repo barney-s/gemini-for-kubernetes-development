@@ -232,31 +232,51 @@ function IssueCard({
                         <button className="btn" onClick={() => handleCreateTask('triage-issue', '', selectedModel ? { model: selectedModel } : {})}>Triage</button>
                         <button className="btn" onClick={() => {
                             const fixTask = tasks.find(t => t.type === 'fix-issue');
-                            if (!fixTask || !fixTask.agentDraft) {
-                                alert("No 'fix-issue' task with a draft found to extract PR ID.");
+                            let prId = null;
+                            if (fixTask && fixTask.agentDraft) {
+                                const match = fixTask.agentDraft.match(/\/pull\/(\d+)/);
+                                if (match) prId = match[1];
+                            }
+                            
+                            if (!prId) {
+                                const input = window.prompt("Could not extract PR ID. Please enter PR ID or URL:");
+                                if (input) {
+                                    const match = input.match(/\/pull\/(\d+)/) || input.match(/^(\d+)$/);
+                                    if (match) prId = match[1];
+                                }
+                            }
+                            
+                            if (!prId) {
+                                alert("Could not obtain PR ID.");
                                 return;
                             }
-                            const match = fixTask.agentDraft.match(/\/pull\/(\d+)/);
-                            if (!match) {
-                                alert("Could not extract PR ID from fix-issue draft.");
-                                return;
-                            }
-                            const params = { PULL_REQUEST_ID: match[1] };
+
+                            const params = { PULL_REQUEST_ID: prId };
                             if (selectedModel) params.model = selectedModel;
                             handleCreateTask('address-feedback', '', params);
                         }}>Address Feedback</button>
                         <button className="btn" onClick={() => {
                             const fixTask = tasks.find(t => t.type === 'fix-issue');
-                            if (!fixTask || !fixTask.agentDraft) {
-                                alert("No 'fix-issue' task with a draft found to extract PR ID.");
+                            let prId = null;
+                            if (fixTask && fixTask.agentDraft) {
+                                const match = fixTask.agentDraft.match(/\/pull\/(\d+)/);
+                                if (match) prId = match[1];
+                            }
+                            
+                            if (!prId) {
+                                const input = window.prompt("Could not extract PR ID. Please enter PR ID or URL:");
+                                if (input) {
+                                    const match = input.match(/\/pull\/(\d+)/) || input.match(/^(\d+)$/);
+                                    if (match) prId = match[1];
+                                }
+                            }
+                            
+                            if (!prId) {
+                                alert("Could not obtain PR ID.");
                                 return;
                             }
-                            const match = fixTask.agentDraft.match(/\/pull\/(\d+)/);
-                            if (!match) {
-                                alert("Could not extract PR ID from fix-issue draft.");
-                                return;
-                            }
-                            const params = { PULL_REQUEST_ID: match[1] };
+
+                            const params = { PULL_REQUEST_ID: prId };
                             if (selectedModel) params.model = selectedModel;
                             handleCreateTask('investigate-failures', '', params);
                         }}>Investigate Failures</button>
