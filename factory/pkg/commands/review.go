@@ -43,6 +43,12 @@ func NewReviewCommand(ctx context.Context) *cobra.Command {
   # Review and post as a draft (pending) review comment
   factory pr review --pr-url https://github.com/owner/repo/pull/1 --publish draft`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !cmd.Flags().Changed("user-secret") {
+				if envVal := os.Getenv("FACTORY_REVIEW_USER"); envVal != "" {
+					rootFlags.UserSecret = envVal
+				}
+			}
+
 			_, err := ResolveRootFlags(cmd)
 			if err != nil {
 				return err
@@ -230,9 +236,9 @@ func runReview(ctx context.Context, prURL string, publishPolicy string, instruct
 		return fmt.Errorf("ensuring review sandbox: %w", err)
 	}
 
-	secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.SecretName, metav1.GetOptions{})
+	secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.UserSecret, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("fetching %s secret in namespace %s: %w (make sure to run 'factory user onboard' first)", rootFlags.SecretName, rootFlags.Namespace, err)
+		return fmt.Errorf("fetching %s secret in namespace %s: %w (make sure to run 'factory user onboard' first)", rootFlags.UserSecret, rootFlags.Namespace, err)
 	}
 	githubLogin := string(secret.Data[KeyGithubLogin])
 	githubEmail := string(secret.Data[KeyGithubEmail])

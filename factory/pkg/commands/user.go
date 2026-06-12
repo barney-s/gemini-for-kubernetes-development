@@ -204,9 +204,9 @@ func RunUserOnboard(ctx context.Context, githubLogin, githubToken, githubEmail, 
 		KeyGithubEmail:  []byte(githubEmail),
 	}
 
-	fmt.Printf("Creating secret '%s' in namespace '%s'...\n", rootFlags.SecretName, targetNamespace)
-	if err := manager.UpdateSecret(ctx, targetNamespace, rootFlags.SecretName, data, nil); err != nil {
-		return fmt.Errorf("updating secret '%s': %w", rootFlags.SecretName, err)
+	fmt.Printf("Creating secret '%s' in namespace '%s'...\n", rootFlags.UserSecret, targetNamespace)
+	if err := manager.UpdateSecret(ctx, targetNamespace, rootFlags.UserSecret, data, nil); err != nil {
+		return fmt.Errorf("updating secret '%s': %w", rootFlags.UserSecret, err)
 	}
 
 	fmt.Printf("Successfully onboarded user '%s' in namespace '%s'.\n", githubLogin, targetNamespace)

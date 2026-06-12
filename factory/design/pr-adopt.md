@@ -79,7 +79,7 @@ factory pr adopt <open|close> --pr-url <url> [flags]
 * `--strategy <reuse|reimplement>` (String, default: `reuse`):
   * `reuse`: Direct git fetch/push (preserves commit history).
   * `reimplement`: Re-apply changes using LLM on the latest base branch.
-* Standard Sandbox configuration flags (e.g., `--namespace`, `--secret-name`, `--workspace-disk-size`, `--image`, `--ephemeral-storage`).
+* Standard Sandbox configuration flags (e.g., `--namespace`, `--user-secret`, `--workspace-disk-size`, `--image`, `--ephemeral-storage`).
 
 ### Reverting `--adopt` flag on other subcommands
 The `--adopt` flag will be removed from `factory pr watch`, `factory pr iterate`, and `factory pr investigate`. These commands will verify ownership of the PR and error out immediately if it does not belong to the factory user:

@@ -387,13 +387,13 @@ func NewSandboxChatCommand(ctx context.Context) *cobra.Command {
 				return fmt.Errorf("creating k8s client: %w", err)
 			}
 
-			secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.SecretName, metav1.GetOptions{})
+			secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.UserSecret, metav1.GetOptions{})
 			if err != nil {
-				return fmt.Errorf("fetching %s secret in namespace %s: %w (make sure to run 'factory user onboard' first)", rootFlags.SecretName, rootFlags.Namespace, err)
+				return fmt.Errorf("fetching %s secret in namespace %s: %w (make sure to run 'factory user onboard' first)", rootFlags.UserSecret, rootFlags.Namespace, err)
 			}
 			geminiKey := getGeminiAPIKey(secret)
 			if geminiKey == "" {
-				return fmt.Errorf("GEMINI_API_KEY not found in secret %s and TOKENSCRIPT_DIR was not set or returned empty", rootFlags.SecretName)
+				return fmt.Errorf("GEMINI_API_KEY not found in secret %s and TOKENSCRIPT_DIR was not set or returned empty", rootFlags.UserSecret)
 			}
 
 			podName, err := envd.GetSandboxPodName(ctx, rootFlags.Namespace, sandboxName)

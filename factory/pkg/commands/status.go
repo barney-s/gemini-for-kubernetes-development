@@ -49,23 +49,23 @@ func NewStatusCommand(ctx context.Context) *cobra.Command {
 				fmt.Fprintln(w, "Agent CRDs\t[OK]\tagents.x-k8s.io/v1alpha1 installed")
 			}
 
-			secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.SecretName, metav1.GetOptions{})
+			secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.UserSecret, metav1.GetOptions{})
 			if err != nil {
-				fmt.Fprintf(w, "User Secret\t[FAIL]\tSecret '%s' missing in namespace '%s' (run 'factory user onboard')\n", rootFlags.SecretName, rootFlags.Namespace)
+				fmt.Fprintf(w, "User Secret\t[FAIL]\tSecret '%s' missing in namespace '%s' (run 'factory user onboard')\n", rootFlags.UserSecret, rootFlags.Namespace)
 			} else {
 				if string(secret.Data[KeyGithubLogin]) == "" {
-					fmt.Fprintf(w, "GitHub Login\t[FAIL]\tGITHUB_LOGIN missing in secret '%s'\n", rootFlags.SecretName)
+					fmt.Fprintf(w, "GitHub Login\t[FAIL]\tGITHUB_LOGIN missing in secret '%s'\n", rootFlags.UserSecret)
 				} else {
 					fmt.Fprintf(w, "GitHub Login\t[OK]\t%s\n", string(secret.Data[KeyGithubLogin]))
 				}
 				if string(secret.Data[KeyGithubToken]) == "" {
-					fmt.Fprintf(w, "GitHub Token\t[FAIL]\tGITHUB_TOKEN missing in secret '%s'\n", rootFlags.SecretName)
+					fmt.Fprintf(w, "GitHub Token\t[FAIL]\tGITHUB_TOKEN missing in secret '%s'\n", rootFlags.UserSecret)
 				} else {
-					fmt.Fprintf(w, "GitHub Token\t[OK]\tConfigured in secret '%s'\n", rootFlags.SecretName)
+					fmt.Fprintf(w, "GitHub Token\t[OK]\tConfigured in secret '%s'\n", rootFlags.UserSecret)
 				}
 				geminiKey := getGeminiAPIKey(secret)
 				if geminiKey == "" {
-					fmt.Fprintf(w, "Gemini Key\t[FAIL]\tGEMINI_API_KEY missing in secret '%s' and TOKENSCRIPT_DIR was not set or returned empty\n", rootFlags.SecretName)
+					fmt.Fprintf(w, "Gemini Key\t[FAIL]\tGEMINI_API_KEY missing in secret '%s' and TOKENSCRIPT_DIR was not set or returned empty\n", rootFlags.UserSecret)
 				} else {
 					if token := geminitokens.GetGeminiAPIKey(nil); token != "" {
 						fmt.Fprintf(w, "Gemini Key\t[OK]\tConfigured via dynamic tokenscript\n")
@@ -77,7 +77,7 @@ func NewStatusCommand(ctx context.Context) *cobra.Command {
 							}
 						}
 					} else {
-						fmt.Fprintf(w, "Gemini Key\t[OK]\tConfigured in secret '%s'\n", rootFlags.SecretName)
+						fmt.Fprintf(w, "Gemini Key\t[OK]\tConfigured in secret '%s'\n", rootFlags.UserSecret)
 					}
 				}
 			}

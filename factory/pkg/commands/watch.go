@@ -653,9 +653,9 @@ func runWatch(ctx context.Context, owner, repo string, interval time.Duration, a
 		return fmt.Errorf("creating k8s client: %w", err)
 	}
 
-	secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.SecretName, metav1.GetOptions{})
+	secret, err := kubeClient.Clientset.CoreV1().Secrets(rootFlags.Namespace).Get(ctx, rootFlags.UserSecret, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("fetching %s secret in namespace %s: %w (make sure to run 'factory user onboard' first)", rootFlags.SecretName, rootFlags.Namespace, err)
+		return fmt.Errorf("fetching %s secret in namespace %s: %w (make sure to run 'factory user onboard' first)", rootFlags.UserSecret, rootFlags.Namespace, err)
 	}
 	githubLogin := string(secret.Data[KeyGithubLogin])
 
@@ -1639,8 +1639,8 @@ func runWatch(ctx context.Context, owner, repo string, interval time.Duration, a
 					if rootFlags.Namespace != "" {
 						args = append(args, "--namespace", rootFlags.Namespace)
 					}
-					if rootFlags.SecretName != "" {
-						args = append(args, "--secret-name", rootFlags.SecretName)
+					if t.Type != "pr-review" && rootFlags.UserSecret != "" {
+						args = append(args, "--user-secret", rootFlags.UserSecret)
 					}
 					if rootFlags.Image != "" {
 						args = append(args, "--image", rootFlags.Image)
