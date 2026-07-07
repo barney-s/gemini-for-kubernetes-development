@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -100,7 +101,7 @@ func BootstrapNamespaceSimple(ctx context.Context, clientset kubernetes.Interfac
 	return nil
 }
 
-// CopySecret copies a secret from source namespace to destination namespace.
+// CopySecret copies a secret from source namespace to destination namespace, updating if changed.
 func CopySecret(ctx context.Context, clientset kubernetes.Interface, srcNS, srcName, dstNS, dstName string) error {
 	log := klog.FromContext(ctx)
 	src, err := clientset.CoreV1().Secrets(srcNS).Get(ctx, srcName, v1.GetOptions{})
@@ -108,20 +109,46 @@ func CopySecret(ctx context.Context, clientset kubernetes.Interface, srcNS, srcN
 		log.Info("Error reading secret", "namespace", srcNS, "name", srcName, "err", err)
 		return err
 	}
-	dst := &corev1.Secret{ObjectMeta: v1.ObjectMeta{Name: dstName, Namespace: dstNS}, Data: src.Data, Type: src.Type}
-	_, err = clientset.CoreV1().Secrets(dstNS).Create(ctx, dst, v1.CreateOptions{})
-	return ignoreAlreadyExists(err)
+	existing, err := clientset.CoreV1().Secrets(dstNS).Get(ctx, dstName, v1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			dst := &corev1.Secret{ObjectMeta: v1.ObjectMeta{Name: dstName, Namespace: dstNS}, Data: src.Data, Type: src.Type}
+			_, err = clientset.CoreV1().Secrets(dstNS).Create(ctx, dst, v1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+	if reflect.DeepEqual(existing.Data, src.Data) && existing.Type == src.Type {
+		return nil
+	}
+	existing.Data = src.Data
+	existing.Type = src.Type
+	_, err = clientset.CoreV1().Secrets(dstNS).Update(ctx, existing, v1.UpdateOptions{})
+	return err
 }
 
-// CopyConfigMap copies a configmap from source namespace to destination namespace.
+// CopyConfigMap copies a configmap from source namespace to destination namespace, updating if changed.
 func CopyConfigMap(ctx context.Context, clientset kubernetes.Interface, srcNS, srcName, dstNS, dstName string) error {
 	src, err := clientset.CoreV1().ConfigMaps(srcNS).Get(ctx, srcName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	dst := &corev1.ConfigMap{ObjectMeta: v1.ObjectMeta{Name: dstName, Namespace: dstNS}, Data: src.Data, BinaryData: src.BinaryData}
-	_, err = clientset.CoreV1().ConfigMaps(dstNS).Create(ctx, dst, v1.CreateOptions{})
-	return ignoreAlreadyExists(err)
+	existing, err := clientset.CoreV1().ConfigMaps(dstNS).Get(ctx, dstName, v1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			dst := &corev1.ConfigMap{ObjectMeta: v1.ObjectMeta{Name: dstName, Namespace: dstNS}, Data: src.Data, BinaryData: src.BinaryData}
+			_, err = clientset.CoreV1().ConfigMaps(dstNS).Create(ctx, dst, v1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+	if reflect.DeepEqual(existing.Data, src.Data) && reflect.DeepEqual(existing.BinaryData, src.BinaryData) {
+		return nil
+	}
+	existing.Data = src.Data
+	existing.BinaryData = src.BinaryData
+	_, err = clientset.CoreV1().ConfigMaps(dstNS).Update(ctx, existing, v1.UpdateOptions{})
+	return err
 }
 
 // SetupServiceAccounts sets up the necessary service accounts and role bindings in the namespace.

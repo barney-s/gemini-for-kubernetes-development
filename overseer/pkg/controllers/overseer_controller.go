@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -274,25 +275,16 @@ func (r *OverseerReconciler) ensureOverseerRBAC(ctx context.Context, o *overseer
 
 func (r *OverseerReconciler) ensureSecrets(ctx context.Context, o *overseerv1alpha1.Overseer, targetNamespace string) error {
 
-	// 1. Reconcile system secrets (tokenscript, github-portal-ca) by copying them
+	// 1. Reconcile system secrets (tokenscript, github-portal-ca) by copying them directly from canonical system namespace
 	systemSecrets := []string{"tokenscript", "github-portal-ca"}
 	for _, name := range systemSecrets {
-		// check if secret exists in targetNamespace
-		s := &corev1.Secret{}
-		err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: targetNamespace}, s)
-		if err == nil {
-			continue
-		}
-		if !errors.IsNotFound(err) {
-			return err
-		}
-		if err := r.copySecret(ctx, name, []string{o.Namespace, "overseer-system"}, targetNamespace); err != nil {
+		if err := r.copySecret(ctx, name, []string{"overseer-system"}, targetNamespace); err != nil {
 			if errors.IsNotFound(err) {
 				if name == "tokenscript" {
 					continue // tokenscript is optional
 				}
 				o.Status.OverseerStatus = "Error"
-				o.Status.Message = fmt.Sprintf("Secret %s not found in %s or overseer-system", name, targetNamespace)
+				o.Status.Message = fmt.Sprintf("Secret %s not found in overseer-system", name)
 				return nil
 			}
 			return err
@@ -490,6 +482,10 @@ func (r *OverseerReconciler) copySecret(ctx context.Context, name string, fromNa
 			return r.Create(ctx, targetSecret)
 		}
 		return err
+	}
+
+	if reflect.DeepEqual(existingSecret.Data, targetSecret.Data) && existingSecret.Type == targetSecret.Type {
+		return nil
 	}
 
 	// Update if data changed
