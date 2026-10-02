@@ -200,8 +200,9 @@ function engineGitGlobal {
 # One of them, credential.helper="", empties the helper list the include
 # brought, so gh's helper is named again in GIT_CONFIG_PARAMETERS — git's
 # `-c`, read after every GIT_CONFIG_KEY_n and passed through by gemini.
-# Another, diff.external="", breaks every plain `git diff`; engineGitShim
-# takes that one out.
+# Another, diff.external="", makes every plain `git diff` fail with
+# "external diff died"; no config value turns it back off, so the prompt
+# tells agents to use `git diff --no-ext-diff`.
 function engineGitConfig {
     local config gh
     config="$(engineGitConfigFile)" || return 0
@@ -212,46 +213,6 @@ function engineGitConfig {
     if gh="$(command -v gh)"; then
         export GIT_CONFIG_PARAMETERS="${GIT_CONFIG_PARAMETERS:+${GIT_CONFIG_PARAMETERS} }'credential.https://github.com.helper'='!${gh} auth git-credential'"
     fi
-    engineGitShim
-}
-
-# engineGitShim puts a git in front of the real one, for gemini's shells, that
-# drops gemini's diff.external="" override. git runs an empty external diff
-# command instead of ignoring it, so every plain `git diff` fails with
-# "external diff died" — repository scripts that check `git diff` with it —
-# and no config value switches the external diff back off (true makes every
-# diff empty). Agents that hit it went on to print their environment and
-# config looking for the cause.
-function engineGitShim {
-    local dir="${USER_HOME}/.config/factory/engine-bin"
-    local real
-    real="$(type -ap git | grep -v "^${dir}/" | head -n 1)"
-    if [ -z "${real}" ]; then
-        return 0
-    fi
-    mkdir -p "${dir}"
-    cat > "${dir}/git" <<EOF
-#!/bin/bash
-# Written by factory (lib.sh engineGitShim): drops gemini-cli's empty
-# diff.external override, then runs ${real}.
-if [ -n "\${GIT_CONFIG_COUNT:-}" ]; then
-    keys=() values=()
-    for ((i = 0; i < GIT_CONFIG_COUNT; i++)); do
-        k="GIT_CONFIG_KEY_\${i}" v="GIT_CONFIG_VALUE_\${i}"
-        if [ "\${!k}" != diff.external ] || [ -n "\${!v}" ]; then
-            keys+=("\${!k}") values+=("\${!v}")
-        fi
-        unset "\${k}" "\${v}"
-    done
-    for i in "\${!keys[@]}"; do
-        export "GIT_CONFIG_KEY_\${i}=\${keys[i]}" "GIT_CONFIG_VALUE_\${i}=\${values[i]}"
-    done
-    export GIT_CONFIG_COUNT="\${#keys[@]}"
-fi
-exec "${real}" "\$@"
-EOF
-    chmod +x "${dir}/git"
-    export PATH="${dir}:${PATH}"
 }
 
 # dropGitHubTokens takes the GitHub tokens out of the engine's environment.

@@ -404,8 +404,8 @@ echo "ENV_TOKENS=$(env | grep -c CODER_TOKEN)"`
 // pushes failed with "could not read Username" (k8s-config-connector#13619);
 // with the whole global config included, `git config --list` printed the
 // token from the github.com rewrite into the trace
-// (fix-k8s-config-connector-13652); and gemini's diff.external="" broke
-// every plain `git diff`.
+// (fix-k8s-config-connector-13652). gemini's diff.external="" still breaks
+// plain `git diff`; the prompt's `git diff --no-ext-diff` must work.
 func TestEngineGitConfig(t *testing.T) {
 	out, _, err := runLib(t, []string{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=foo.inherited", "GIT_CONFIG_VALUE_0=kept"}, engineGitSetup, `
 engineGitConfig
@@ -419,7 +419,7 @@ export GIT_CONFIG_COUNT=$((n+3))
 `+engineGitReport+`
 echo "INHERITED=$(git config foo.inherited)"
 echo "HOOKS=[$(git config core.hooksPath)]"
-echo "DIFF=$(git diff 2>&1 | grep -e '^+two' -e 'external diff')"`)
+echo "DIFF=$(git diff --no-ext-diff 2>&1 | grep -e '^+two' -e 'external diff')"`)
 	if err != nil {
 		t.Fatalf("harness failed: %v\n%s", err, out)
 	}
