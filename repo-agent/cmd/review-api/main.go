@@ -73,6 +73,7 @@ func main() {
 		}
 	}
 	store := cookie.NewStore([]byte(sessionSecret))
+	store.Options(auth.SessionCookieOptions(auth.CookieSecureConfig()))
 	router.Use(sessions.Sessions(sessionName, store))
 
 	// Register Routes

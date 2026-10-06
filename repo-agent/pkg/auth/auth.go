@@ -157,6 +157,7 @@ func (a *Authenticator) Callback(c *gin.Context) {
 	}
 
 	session := sessions.Default(c)
+	session.Options(SessionOptionsForRequest(c.Request))
 	session.Set(UserKey, ghUser)
 	// Reset namespace on new login
 	session.Delete(NamespaceKey)
@@ -241,6 +242,7 @@ func (a *Authenticator) Status(c *gin.Context) {
 func (a *Authenticator) Logout(c *gin.Context) {
 	log := klog.FromContext(c.Request.Context())
 	session := sessions.Default(c)
+	session.Options(SessionOptionsForRequest(c.Request))
 	session.Delete(UserKey)
 	session.Delete(NamespaceKey)
 	if err := session.Save(); err != nil {
@@ -273,6 +275,7 @@ func (a *Authenticator) SwitchNamespace(c *gin.Context) {
 		return
 	}
 
+	session.Options(SessionOptionsForRequest(c.Request))
 	if payload.Namespace == "" {
 		// Reset to user's own namespace
 		session.Delete(NamespaceKey)
