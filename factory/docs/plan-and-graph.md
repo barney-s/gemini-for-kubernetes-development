@@ -58,8 +58,8 @@ The plan as it is when the label goes on is the one implemented. Apply
 
 ## 3. The graph
 
-The graph controller (`factory watch --graphs`, or `WATCH_GRAPHS=true`)
-keeps every graph parent moving. A parent is an issue labelled `<t>/graph`;
+The graph controller (`factory watch --graphs`, or `WATCH_GRAPHS=true`;
+on an Overseer, `spec.graphs: true`) keeps every graph parent moving. A parent is an issue labelled `<t>/graph`;
 one with no start block whose plan has a Breakdown is started from its
 plan - the label is the approval, the watcher's on `implement` or a
 maintainer's.
@@ -189,5 +189,3 @@ Create them in the repository before using the flow:
   relabel it.
 - A replan does not yet read the graph's status or the finished children's
   PRs.
-- An Overseer cannot turn the graph controller on yet: its resource has no
-  field for it, and `WATCH_GRAPHS` is not passed to the watch.
